@@ -3,3 +3,4 @@ uvicorn[standard]==0.34.0
 httpx==0.28.1
 shapely==2.0.6
 pydantic==2.10.3
+asyncpg==0.30.0

@@ -2,6 +2,7 @@ apiVersion: 1
 
 datasources:
   - name: WeatherDW
+    uid: weather_dw
     type: postgres
     access: proxy
     url: postgres:5432

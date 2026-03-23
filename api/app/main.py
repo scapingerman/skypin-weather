@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import uuid
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -12,9 +13,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from shapely.geometry import Point
 
+from .dim_match import load_dim_cities, match_places_to_warehouse_names
 from .geo import bbox_too_large, geojson_polygon_to_shapely
 from .overpass import fetch_places_in_bbox
 from .risk import aggregate_forecast_risk
+from .selection_store import persist_area_selection
 
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(__name__)
@@ -32,6 +35,8 @@ def _overpass_urls() -> list[str]:
         return [u.strip() for u in multi.split(",") if u.strip()]
     primary = os.environ.get("OVERPASS_URL", DEFAULT_OVERPASS).strip()
     return [primary, OVERPASS_FALLBACK]
+
+
 HOURLY = (
     "temperature_2m,precipitation,precipitation_probability,weathercode,"
     "wind_speed_10m,wind_direction_10m,surface_pressure,cloud_cover"
@@ -69,13 +74,35 @@ class AreaRiskResponse(BaseModel):
     total_in_polygon: int
     truncated: bool
     message: str | None = None
+    grafana_city_names: list[str] | None = None
+    selection_id: str | None = Field(
+        default=None,
+        description="UUID for Grafana map-polygon dashboard (api.area_selection_hourly).",
+    )
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    pool = None
+    host = os.environ.get("POSTGRES_HOST", "").strip()
+    if host:
+        import asyncpg
+
+        pool = await asyncpg.create_pool(
+            host=host,
+            port=int(os.environ.get("POSTGRES_PORT", "5432")),
+            user=os.environ.get("POSTGRES_USER", "weather"),
+            password=os.environ.get("POSTGRES_PASSWORD", "weather"),
+            database=os.environ.get("POSTGRES_DB", "weather_dw"),
+            min_size=1,
+            max_size=4,
+        )
+    app.state.pg_pool = pool
     async with httpx.AsyncClient(timeout=120.0) as client:
         app.state.http = client
         yield
+    if pool is not None:
+        await pool.close()
 
 
 app = FastAPI(title="Skypin Area Risk API", lifespan=lifespan)
@@ -129,6 +156,14 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+def _persist_enabled() -> bool:
+    return os.environ.get("API_PERSIST_SELECTION", "true").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
 @app.post("/api/area/risk", response_model=AreaRiskResponse)
 async def area_risk(body: AreaRiskRequest) -> AreaRiskResponse:
     if body.geometry.get("type") != "Polygon":
@@ -172,7 +207,9 @@ async def area_risk(body: AreaRiskRequest) -> AreaRiskResponse:
             last_exc = exc
             code = exc.response.status_code if exc.response is not None else 0
             if code in (429, 502, 503, 504):
-                LOG.warning("Overpass %s returned %s, trying next mirror", overpass_url, code)
+                LOG.warning(
+                    "Overpass %s returned %s, trying next mirror", overpass_url, code
+                )
                 continue
             LOG.exception("Overpass failed")
             raise HTTPException(
@@ -203,7 +240,9 @@ async def area_risk(body: AreaRiskRequest) -> AreaRiskResponse:
 
     sem = asyncio.Semaphore(MAX_CONCURRENT_METEO)
 
-    async def one(row: dict[str, Any]) -> PlaceRisk:
+    async def one_place(
+        row: dict[str, Any],
+    ) -> tuple[PlaceRisk, dict[str, Any], dict[str, Any]]:
         async with sem:
             hourly = await _open_meteo_forecast(
                 client,
@@ -216,7 +255,7 @@ async def area_risk(body: AreaRiskRequest) -> AreaRiskResponse:
             body.alert_rain_mm_h,
             body.min_precip_prob_pct,
         )
-        return PlaceRisk(
+        pr = PlaceRisk(
             name=row["name"],
             place=row["place"],
             lat=row["lat"],
@@ -224,9 +263,14 @@ async def area_risk(body: AreaRiskRequest) -> AreaRiskResponse:
             max_risk_score=round(mx, 2),
             alert_hours=ah,
         )
+        return pr, row, hourly
 
-    places = await asyncio.gather(*[one(r) for r in inside])
-    places = sorted(places, key=lambda p: p.max_risk_score, reverse=True)
+    raw_results = await asyncio.gather(*[one_place(r) for r in inside])
+    places = sorted(
+        [t[0] for t in raw_results],
+        key=lambda p: p.max_risk_score,
+        reverse=True,
+    )
 
     msg = None
     if total == 0:
@@ -234,9 +278,46 @@ async def area_risk(body: AreaRiskRequest) -> AreaRiskResponse:
     elif truncated:
         msg = f"Showing top {body.max_places} by processing order; {total} places matched."
 
+    grafana_city_names: list[str] | None = None
+    selection_id_str: str | None = None
+    pg_pool = getattr(app.state, "pg_pool", None)
+
+    if pg_pool is not None and inside:
+        try:
+            async with pg_pool.acquire() as conn:
+                dim_rows = await load_dim_cities(conn)
+            keys = [(r["name"], float(r["lat"]), float(r["lon"])) for r in inside]
+            matched = match_places_to_warehouse_names(keys, dim_rows)
+            if matched:
+                grafana_city_names = matched
+        except Exception:
+            LOG.exception(
+                "Warehouse city match failed; embedded Grafana will show all cities."
+            )
+            grafana_city_names = None
+
+        if _persist_enabled():
+            try:
+                sid = uuid.uuid4()
+                payloads = [(t[1], t[2]) for t in raw_results]
+                async with pg_pool.acquire() as conn:
+                    n = await persist_area_selection(
+                        conn,
+                        sid,
+                        payloads,
+                        body.alert_rain_mm_h,
+                        body.min_precip_prob_pct,
+                    )
+                if n > 0:
+                    selection_id_str = str(sid)
+            except Exception:
+                LOG.exception("Persisting area selection to Postgres failed.")
+
     return AreaRiskResponse(
         places=list(places),
         total_in_polygon=total,
         truncated=truncated,
         message=msg,
+        grafana_city_names=grafana_city_names,
+        selection_id=selection_id_str,
     )

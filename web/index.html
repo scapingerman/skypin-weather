@@ -131,9 +131,83 @@
     iframe {
       display: block;
       width: 100%;
-      height: 380px;
+      height: 420px;
       border: 0;
       background: #111;
+    }
+    .charts-section {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      margin-bottom: 1rem;
+    }
+    .charts-section h2 {
+      margin: 0 0 0.5rem;
+      font-size: 0.95rem;
+      color: var(--muted);
+    }
+    .charts-section p.note {
+      margin: 0 0 0.75rem;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    .chart-canvas-wrap {
+      position: relative;
+      height: min(520px, calc(32px + 24px * var(--chart-rows, 8)));
+      min-height: 180px;
+    }
+    .charts-two-col {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 960px) {
+      .charts-two-col {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    .charts-two-col h3 {
+      margin: 0 0 0.4rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--muted);
+    }
+    .selection-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .stat-card {
+      background: #21262d;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.6rem 0.75rem;
+    }
+    .stat-card .stat-label {
+      display: block;
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-bottom: 0.2rem;
+    }
+    .stat-card .stat-value {
+      font-size: 1.2rem;
+      font-weight: 600;
+    }
+    .polygon-grafana-grid {
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 900px) {
+      .polygon-grafana-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    .polygon-grafana-grid .frame-wrap.polygon-span-full {
+      grid-column: 1 / -1;
+    }
+    .area-grafana-section {
+      margin-bottom: 1rem;
     }
     code {
       font-size: 0.8em;
@@ -149,7 +223,8 @@
     <p>
       Use the toolbar on the map: draw a <strong>rectangle</strong> or a <strong>closed polygon</strong>. We query
       OpenStreetMap (cities/towns/villages), then Open-Meteo, using the same risk formula as the warehouse
-      <code>mart</code>. Grafana panels below stay global (latest ETL run).
+      <code>mart</code>. After each draw, the API can write hourly rows to <code>api.area_selection_hourly</code> so
+      Grafana can chart <strong>every place in the polygon</strong>, not only CSV cities.
     </p>
   </header>
   <main>
@@ -180,22 +255,95 @@
       </div>
     </div>
 
+    <div class="charts-section" id="charts-section" hidden>
+      <h2>Charts — your drawn area (API)</h2>
+      <p class="note">
+        Same data as the table. Grafana embeds below use the polygon snapshot in Postgres when <code>selection_id</code> is returned.
+        <a id="grafana-home-link" href="#" target="_blank" rel="noopener">Open Grafana</a> for the full dashboard.
+      </p>
+      <div id="selection-stats" class="selection-stats" hidden>
+        <div class="stat-card">
+          <span class="stat-label">Places listed</span>
+          <span class="stat-value" id="stat-places">—</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Alert hours (sum)</span>
+          <span class="stat-value" id="stat-alerts">—</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Max risk (any place)</span>
+          <span class="stat-value" id="stat-maxrisk">—</span>
+        </div>
+      </div>
+      <div class="charts-two-col">
+        <div>
+          <h3>Max risk by place</h3>
+          <div class="chart-canvas-wrap" id="chart-wrap-max">
+            <canvas id="chart-area-max" aria-label="Max risk by place in selection"></canvas>
+          </div>
+        </div>
+        <div>
+          <h3>Alert hours by place</h3>
+          <div class="chart-canvas-wrap" id="chart-wrap-alerts">
+            <canvas id="chart-area-alerts" aria-label="Alert hours by place in selection"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="area-grafana-section" class="area-grafana-section" hidden>
+      <p class="hint" style="margin-top: 0">
+        <strong>Map polygon → Postgres:</strong> panels use <code>var-selection_id</code> from the API response (Open-Meteo
+        hourly snapshot). Requires Postgres init <code>03_api_area_selection.sql</code> and API with
+        <code>POSTGRES_HOST</code> set.
+      </p>
+      <div class="grid polygon-grafana-grid">
+        <div class="frame-wrap polygon-span-full">
+          <h2>Grafana (polygon) — Precipitation &amp; probability</h2>
+          <iframe
+            id="frame-area-precip"
+            title="Grafana polygon precipitation"
+            referrerpolicy="no-referrer-when-downgrade"
+          ></iframe>
+        </div>
+        <div class="frame-wrap">
+          <h2>Grafana (polygon) — Hourly risk</h2>
+          <iframe
+            id="frame-area-ts"
+            title="Grafana polygon hourly risk"
+            referrerpolicy="no-referrer-when-downgrade"
+          ></iframe>
+        </div>
+        <div class="frame-wrap">
+          <h2>Grafana (polygon) — Max risk (horizontal)</h2>
+          <iframe
+            id="frame-area-bar"
+            title="Grafana polygon max risk"
+            referrerpolicy="no-referrer-when-downgrade"
+          ></iframe>
+        </div>
+      </div>
+    </div>
+
+    <p class="hint" id="grafana-filter-hint" style="margin-top: 0">
+      <strong>Warehouse (ETL):</strong> iframes below use <code>var-city_name</code> when the API matches OSM places to
+      <code>dim_city</code>; otherwise all CSV cities. Only cities in your targets CSV appear in <code>mart</code>.
+    </p>
+
     <div class="grid">
       <div class="frame-wrap">
-        <h2>Grafana — Risk score by city (time series)</h2>
+        <h2>Grafana (warehouse) — Risk score by city</h2>
         <iframe
           id="frame-risk"
           title="Grafana risk score panel"
-          loading="lazy"
           referrerpolicy="no-referrer-when-downgrade"
         ></iframe>
       </div>
       <div class="frame-wrap">
-        <h2>Grafana — Max risk by city (bar chart)</h2>
+        <h2>Grafana (warehouse) — Max risk by city</h2>
         <iframe
           id="frame-max"
           title="Grafana max risk panel"
-          loading="lazy"
           referrerpolicy="no-referrer-when-downgrade"
         ></iframe>
       </div>
@@ -204,37 +352,212 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js" crossorigin="anonymous"></script>
   <script>
     (function () {
       const API_BASE = "http://localhost:8000";
       const GRAFANA_ORIGIN = "http://localhost:3000";
       const DASH_UID = "weather-dw-overview";
       const DASH_SLUG = "weather-dw-overview";
+      const DASH_AREA_UID = "weather-area-polygon";
+      const DASH_AREA_SLUG = "weather-area-polygon";
       const ORG_ID = 1;
-      const TIME = "from=now-72h&to=now%2B72h";
+      /** Max names appended to Grafana URL (avoid over-long iframe URLs). */
+      const GRAFANA_CITY_CAP = 30;
+      const GRAFANA_VAR_CITY = "city_name";
 
-      function soloUrl(panelId) {
-        const q = new URLSearchParams({
-          orgId: String(ORG_ID),
-          panelId: String(panelId),
-          theme: "dark",
-          kiosk: "1",
-        });
-        return (
-          GRAFANA_ORIGIN +
+      function soloWarehouseUrl(panelId, cityNames) {
+        const path =
           "/d-solo/" +
           encodeURIComponent(DASH_UID) +
           "/" +
-          encodeURIComponent(DASH_SLUG) +
-          "?" +
-          TIME +
-          "&" +
-          q.toString()
-        );
+          encodeURIComponent(DASH_SLUG);
+        const u = new URL(path, GRAFANA_ORIGIN + "/");
+        u.searchParams.set("from", "now-72h");
+        u.searchParams.set("to", "now+72h");
+        u.searchParams.set("orgId", String(ORG_ID));
+        u.searchParams.set("panelId", String(panelId));
+        u.searchParams.set("theme", "dark");
+        u.searchParams.set("kiosk", "1");
+        if (cityNames && cityNames.length) {
+          const slice = cityNames.slice(0, GRAFANA_CITY_CAP);
+          for (let i = 0; i < slice.length; i++) {
+            const n = slice[i];
+            if (n != null && String(n).trim() !== "") {
+              u.searchParams.append("var-" + GRAFANA_VAR_CITY, String(n).trim());
+            }
+          }
+        }
+        return u.toString();
       }
 
-      document.getElementById("frame-risk").src = soloUrl(3);
-      document.getElementById("frame-max").src = soloUrl(4);
+      function soloPolygonUrl(panelId, selectionId) {
+        const path =
+          "/d-solo/" +
+          encodeURIComponent(DASH_AREA_UID) +
+          "/" +
+          encodeURIComponent(DASH_AREA_SLUG);
+        const u = new URL(path, GRAFANA_ORIGIN + "/");
+        u.searchParams.set("from", "now-24h");
+        u.searchParams.set("to", "now+7d");
+        u.searchParams.set("orgId", String(ORG_ID));
+        u.searchParams.set("panelId", String(panelId));
+        u.searchParams.set("theme", "dark");
+        u.searchParams.set("kiosk", "1");
+        u.searchParams.set("var-selection_id", selectionId);
+        return u.toString();
+      }
+
+      function setGrafanaFrames(cityNames) {
+        document.getElementById("frame-risk").src = soloWarehouseUrl(3, cityNames);
+        document.getElementById("frame-max").src = soloWarehouseUrl(4, cityNames);
+      }
+
+      function setPolygonGrafanaFrames(selectionId) {
+        const wrap = document.getElementById("area-grafana-section");
+        const f0 = document.getElementById("frame-area-precip");
+        const f1 = document.getElementById("frame-area-ts");
+        const f2 = document.getElementById("frame-area-bar");
+        if (!selectionId || String(selectionId).trim() === "") {
+          wrap.hidden = true;
+          f0.removeAttribute("src");
+          f1.removeAttribute("src");
+          f2.removeAttribute("src");
+          return;
+        }
+        wrap.hidden = false;
+        f0.src = soloPolygonUrl(4, selectionId);
+        f1.src = soloPolygonUrl(16, selectionId);
+        f2.src = soloPolygonUrl(18, selectionId);
+      }
+
+      setGrafanaFrames(null);
+      setPolygonGrafanaFrames(null);
+      const grafanaHome = document.getElementById("grafana-home-link");
+      if (grafanaHome) grafanaHome.href = GRAFANA_ORIGIN + "/";
+
+      const chartsSection = document.getElementById("charts-section");
+      const chartWrapMax = document.getElementById("chart-wrap-max");
+      const chartWrapAlerts = document.getElementById("chart-wrap-alerts");
+      const selectionStatsEl = document.getElementById("selection-stats");
+      let selectionChartMax = null;
+      let selectionChartAlerts = null;
+
+      function destroySelectionCharts() {
+        if (selectionChartMax) {
+          selectionChartMax.destroy();
+          selectionChartMax = null;
+        }
+        if (selectionChartAlerts) {
+          selectionChartAlerts.destroy();
+          selectionChartAlerts = null;
+        }
+      }
+
+      function renderSelectionCharts(places) {
+        destroySelectionCharts();
+        if (!places.length || typeof Chart === "undefined") {
+          chartsSection.hidden = true;
+          selectionStatsEl.hidden = true;
+          return;
+        }
+        chartsSection.hidden = false;
+        selectionStatsEl.hidden = false;
+        var sumAlerts = 0;
+        var maxRisk = 0;
+        for (var si = 0; si < places.length; si++) {
+          sumAlerts += places[si].alert_hours;
+          if (places[si].max_risk_score > maxRisk) maxRisk = places[si].max_risk_score;
+        }
+        document.getElementById("stat-places").textContent = String(places.length);
+        document.getElementById("stat-alerts").textContent = String(sumAlerts);
+        document.getElementById("stat-maxrisk").textContent = String(maxRisk);
+
+        const rows = Math.min(places.length, 50);
+        chartWrapMax.style.setProperty("--chart-rows", String(rows));
+        chartWrapAlerts.style.setProperty("--chart-rows", String(rows));
+
+        const labels = places.map(function (p) {
+          const n = p.name || "(unnamed)";
+          return n.length > 36 ? n.slice(0, 34) + "…" : n;
+        });
+        const scores = places.map(function (p) {
+          return p.max_risk_score;
+        });
+        const alerts = places.map(function (p) {
+          return p.alert_hours;
+        });
+        var alertMax = 1;
+        for (var ai = 0; ai < alerts.length; ai++) {
+          if (alerts[ai] > alertMax) alertMax = alerts[ai];
+        }
+        alertMax = Math.ceil(alertMax * 1.15);
+
+        const muted = "#8b949e";
+        const grid = "#30363d";
+        const text = "#e6edf3";
+        const barOpts = {
+          indexAxis: "y",
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: text } },
+          },
+          scales: {
+            x: {
+              min: 0,
+              ticks: { color: muted },
+              grid: { color: grid },
+            },
+            y: {
+              ticks: { color: muted, font: { size: 11 }, maxRotation: 0 },
+              grid: { color: grid },
+            },
+          },
+        };
+
+        selectionChartMax = new Chart(document.getElementById("chart-area-max"), {
+          type: "bar",
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                label: "Max risk",
+                data: scores,
+                backgroundColor: "rgba(88, 166, 255, 0.55)",
+                borderColor: "rgba(88, 166, 255, 0.9)",
+                borderWidth: 1,
+              },
+            ],
+          },
+          options: Object.assign({}, barOpts, {
+            scales: Object.assign({}, barOpts.scales, {
+              x: Object.assign({}, barOpts.scales.x, { suggestedMax: 10 }),
+            }),
+          }),
+        });
+
+        selectionChartAlerts = new Chart(document.getElementById("chart-area-alerts"), {
+          type: "bar",
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                label: "Alert hours",
+                data: alerts,
+                backgroundColor: "rgba(210, 153, 34, 0.5)",
+                borderColor: "rgba(210, 153, 34, 0.95)",
+                borderWidth: 1,
+              },
+            ],
+          },
+          options: Object.assign({}, barOpts, {
+            scales: Object.assign({}, barOpts.scales, {
+              x: Object.assign({}, barOpts.scales.x, { suggestedMax: alertMax }),
+            }),
+          }),
+        });
+      }
 
       const map = L.map("map").setView([-32, -64], 5);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -307,6 +630,11 @@
           const places = data.places || [];
           if (places.length === 0) {
             tableEl.hidden = true;
+            destroySelectionCharts();
+            chartsSection.hidden = true;
+            selectionStatsEl.hidden = true;
+            setGrafanaFrames(null);
+            setPolygonGrafanaFrames(null);
             return;
           }
           for (const p of places) {
@@ -328,9 +656,22 @@
             tbodyEl.appendChild(tr);
           }
           tableEl.hidden = false;
+          renderSelectionCharts(places);
+          var gfv = data.grafana_city_names;
+          if (gfv && gfv.length) {
+            setGrafanaFrames(gfv);
+          } else {
+            setGrafanaFrames(null);
+          }
+          setPolygonGrafanaFrames(data.selection_id || null);
         } catch (e) {
           statusEl.className = "err";
           statusEl.textContent = "Error: " + (e.message || String(e));
+          destroySelectionCharts();
+          chartsSection.hidden = true;
+          selectionStatsEl.hidden = true;
+          setGrafanaFrames(null);
+          setPolygonGrafanaFrames(null);
         }
       }
 
@@ -358,6 +699,11 @@
         statusEl.textContent = "Draw a rectangle or polygon to load data.";
         tableEl.hidden = true;
         tbodyEl.innerHTML = "";
+        destroySelectionCharts();
+        chartsSection.hidden = true;
+        selectionStatsEl.hidden = true;
+        setGrafanaFrames(null);
+        setPolygonGrafanaFrames(null);
       });
     })();
   </script>

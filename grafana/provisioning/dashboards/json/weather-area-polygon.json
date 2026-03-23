@@ -1,0 +1,418 @@
+{
+  "annotations": { "list": [] },
+  "description": "Open-Meteo hourly forecast snapshot for OSM places inside the map polygon (api.area_selection_hourly). Variables follow WMO-style codes where noted.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": "WeatherDW",
+      "description": "Count of place-hour rows with storm_risk_flag (same rule as mart: storm WMO 95–99 or heavy rain + high PoP).",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "orange", "value": 8 },
+              { "color": "red", "value": 24 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "datasource": "WeatherDW",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT count(*)::int AS alert_place_hours\nFROM api.area_selection_hourly\nWHERE selection_id = CAST(NULLIF(TRIM('${selection_id}'), '') AS uuid)\n  AND storm_risk_flag = true;",
+          "refId": "A"
+        }
+      ],
+      "title": "Alert place-hours",
+      "type": "stat"
+    },
+    {
+      "datasource": "WeatherDW",
+      "description": "Maximum risk_score across all places and forecast hours in this selection.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 35 },
+              { "color": "orange", "value": 55 },
+              { "color": "red", "value": 75 }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "datasource": "WeatherDW",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT round(max(risk_score)::numeric, 1) AS max_risk\nFROM api.area_selection_hourly\nWHERE selection_id = CAST(NULLIF(TRIM('${selection_id}'), '') AS uuid);",
+          "refId": "A"
+        }
+      ],
+      "title": "Max risk (selection)",
+      "type": "stat"
+    },
+    {
+      "datasource": "WeatherDW",
+      "description": "Open-Meteo: hourly precipitation sum (mm) and probability of precipitation (%). Dual axis.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "lineWidth": 2,
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byRegexp", "options": ".*\\(mm\\)$" },
+            "properties": [
+              { "id": "unit", "value": "lengthmm" },
+              { "id": "custom.axisPlacement", "value": "left" },
+              { "id": "min", "value": 0 }
+            ]
+          },
+          {
+            "matcher": { "id": "byRegexp", "options": ".*\\(%\\)$" },
+            "properties": [
+              { "id": "unit", "value": "percent" },
+              { "id": "custom.axisPlacement", "value": "right" },
+              { "id": "min", "value": 0 },
+              { "id": "max", "value": 100 }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 4 },
+      "id": 4,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "datasource": "WeatherDW",
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT forecast_ts_utc AS time,\n       place_name || ' (mm)' AS metric,\n       precipitation AS value\nFROM api.area_selection_hourly\nWHERE selection_id = CAST(NULLIF(TRIM('${selection_id}'), '') AS uuid)\nORDER BY 1, 2;",
+          "refId": "A"
+        },
+        {
+          "datasource": "WeatherDW",
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT forecast_ts_utc AS time,\n       place_name || ' (%)' AS metric,\n       precipitation_probability::double precision AS value\nFROM api.area_selection_hourly\nWHERE selection_id = CAST(NULLIF(TRIM('${selection_id}'), '') AS uuid)\nORDER BY 1, 2;",
+          "refId": "B"
+        }
+      ],
+      "title": "Precipitation & probability (by place)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "WeatherDW",
+      "description": "Area mean 2 m temperature — quick synoptic trend across the polygon.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "drawStyle": "line", "fillOpacity": 8, "lineWidth": 2, "showPoints": "never" },
+          "unit": "celsius"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 13 },
+      "id": 6,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single" }
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "datasource": "WeatherDW",
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT forecast_ts_utc AS time,\n       'Area mean T' AS metric,\n       avg(temperature_2m) AS value\nFROM api.area_selection_hourly\nWHERE selection_id = CAST(NULLIF(TRIM('${selection_id}'), '') AS uuid)\nGROUP BY forecast_ts_utc\nORDER BY 1;",
+          "refId": "A"
+        }
+      ],
+      "title": "Mean 2 m temperature (area)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "WeatherDW",
+      "description": "Open-Meteo surface pressure (model grid). Useful for pressure tendency (Δp/3h style inspection visually).",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "light-blue" },
+          "custom": { "drawStyle": "line", "fillOpacity": 0, "lineWidth": 2, "showPoints": "never" },
+          "unit": "pressurehPa"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 13 },
+      "id": 8,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single" }
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "datasource": "WeatherDW",
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT forecast_ts_utc AS time,\n       'Area mean surface p' AS metric,\n       avg(surface_pressure) AS value\nFROM api.area_selection_hourly\nWHERE selection_id = CAST(NULLIF(TRIM('${selection_id}'), '') AS uuid)\n  AND surface_pressure IS NOT NULL\nGROUP BY forecast_ts_utc\nORDER BY 1;",
+          "refId": "A"
+        }
+      ],
+      "title": "Mean surface pressure (area)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "WeatherDW",
+      "description": "10 m wind: ensemble mean and max across places each hour (convective gusts not in this API).",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" },
+          "unit": "velocityms"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 20 },
+      "id": 10,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi" }
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "datasource": "WeatherDW",
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT forecast_ts_utc AS time,\n       'Mean wind 10 m' AS metric,\n       avg(wind_speed_10m) AS value\nFROM api.area_selection_hourly\nWHERE selection_id = CAST(NULLIF(TRIM('${selection_id}'), '') AS uuid)\nGROUP BY forecast_ts_utc\nORDER BY 1;",
+          "refId": "A"
+        },
+        {
+          "datasource": "WeatherDW",
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT forecast_ts_utc AS time,\n       'Max wind 10 m' AS metric,\n       max(wind_speed_10m) AS value\nFROM api.area_selection_hourly\nWHERE selection_id = CAST(NULLIF(TRIM('${selection_id}'), '') AS uuid)\nGROUP BY forecast_ts_utc\nORDER BY 1;",
+          "refId": "B"
+        }
+      ],
+      "title": "Wind speed 10 m (area mean / max)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "WeatherDW",
+      "description": "Total cloud cover 0–100% (ECMWF-style interpretation). Area mean.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "continuous-BlYlRd" },
+          "custom": { "drawStyle": "line", "fillOpacity": 25, "lineWidth": 2, "showPoints": "never" },
+          "max": 100,
+          "min": 0,
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 20 },
+      "id": 12,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single" }
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "datasource": "WeatherDW",
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT forecast_ts_utc AS time,\n       'Area mean cloud' AS metric,\n       avg(cloud_cover) AS value\nFROM api.area_selection_hourly\nWHERE selection_id = CAST(NULLIF(TRIM('${selection_id}'), '') AS uuid)\n  AND cloud_cover IS NOT NULL\nGROUP BY forecast_ts_utc\nORDER BY 1;",
+          "refId": "A"
+        }
+      ],
+      "title": "Cloud cover (area mean)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "WeatherDW",
+      "description": "WMO Weather interpretation codes (WW) as returned by Open-Meteo. Max code each hour across the polygon highlights worst category present. Thunderstorm-related codes typically 95–99.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "drawStyle": "line", "fillOpacity": 0, "lineWidth": 2, "showPoints": "auto" },
+          "max": 99,
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 27 },
+      "id": 14,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single" }
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "datasource": "WeatherDW",
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT forecast_ts_utc AS time,\n       'Max WMO code (area)' AS metric,\n       max(weathercode)::double precision AS value\nFROM api.area_selection_hourly\nWHERE selection_id = CAST(NULLIF(TRIM('${selection_id}'), '') AS uuid)\nGROUP BY forecast_ts_utc\nORDER BY 1;",
+          "refId": "A"
+        }
+      ],
+      "title": "WMO weather code — max in polygon",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "WeatherDW",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "lineWidth": 2,
+            "showPoints": "never",
+            "stacking": { "group": "A", "mode": "none" }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 9, "w": 16, "x": 0, "y": 33 },
+      "id": 16,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi" }
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "datasource": "WeatherDW",
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT forecast_ts_utc AS time,\n       place_name AS metric,\n       risk_score AS value\nFROM api.area_selection_hourly\nWHERE selection_id = CAST(NULLIF(TRIM('${selection_id}'), '') AS uuid)\nORDER BY 1, 2;",
+          "refId": "A"
+        }
+      ],
+      "title": "Risk score by place (hourly)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "WeatherDW",
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" } },
+        "overrides": []
+      },
+      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 33 },
+      "id": 18,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": false },
+        "orientation": "horizontal",
+        "showValue": "always",
+        "stacking": "none",
+        "tooltip": { "mode": "single" }
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "datasource": "WeatherDW",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT place_name,\n       max(risk_score) AS max_risk\nFROM api.area_selection_hourly\nWHERE selection_id = CAST(NULLIF(TRIM('${selection_id}'), '') AS uuid)\nGROUP BY place_name\nORDER BY max_risk DESC;",
+          "refId": "A"
+        }
+      ],
+      "title": "Max risk by place",
+      "type": "barchart"
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 40,
+  "tags": ["weather", "api", "polygon", "open-meteo"],
+  "templating": {
+    "list": [
+      {
+        "current": { "text": "", "value": "" },
+        "hide": 0,
+        "label": "Selection ID",
+        "name": "selection_id",
+        "options": [{ "selected": true, "text": "", "value": "" }],
+        "query": "",
+        "skipUrlSync": false,
+        "type": "textbox"
+      }
+    ]
+  },
+  "time": { "from": "now-24h", "to": "now+7d" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Weather area polygon",
+  "uid": "weather-area-polygon",
+  "version": 2,
+  "weekStart": ""
+}

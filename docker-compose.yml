@@ -25,12 +25,18 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: ${GF_ADMIN_PASSWORD:-admin}
       GF_USERS_DEFAULT_THEME: dark
       GF_INSTALL_PLUGINS: ""
+      # Correct absolute URLs for JS/CSS when loaded inside an iframe (another origin/port).
+      GF_SERVER_ROOT_URL: ${GF_SERVER_ROOT_URL:-http://localhost:3000/}
+      # Avoid strict CSP breaking embedded panel loads in some browsers.
+      GF_SECURITY_CONTENT_SECURITY_POLICY: "false"
+      GF_SECURITY_COOKIE_SECURE: "false"
       # Allow embedding Grafana panels in iframes (e.g. web/index.html)
       GF_SECURITY_ALLOW_EMBEDDING: "true"
       # Anonymous Viewer lets local pages on another port load /d-solo/ without login.
       # Disable for any internet-exposed deployment.
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_AUTH_ANONYMOUS_ORG_NAME: Main org.
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
@@ -66,6 +72,14 @@ services:
     environment:
       OPEN_METEO_BASE: ${OPEN_METEO_BASE:-https://api.open-meteo.com/v1/forecast}
       OVERPASS_URL: ${OVERPASS_URL:-https://overpass-api.de/api/interpreter}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${POSTGRES_USER:-weather}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-weather}
+      POSTGRES_DB: ${POSTGRES_DB:-weather_dw}
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   pg_data:
