@@ -25,6 +25,12 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: ${GF_ADMIN_PASSWORD:-admin}
       GF_USERS_DEFAULT_THEME: dark
       GF_INSTALL_PLUGINS: ""
+      # Allow embedding Grafana panels in iframes (e.g. web/index.html)
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+      # Anonymous Viewer lets local pages on another port load /d-solo/ without login.
+      # Disable for any internet-exposed deployment.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro

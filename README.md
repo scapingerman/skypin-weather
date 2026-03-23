@@ -47,6 +47,36 @@ ORDER BY m.storm_risk_flag DESC, m.risk_score DESC, m.forecast_ts_utc;
 | `data/targets/city_targets.csv` | Per-city thresholds (versioned spreadsheet) |
 | `etl/weather_dw/` | Python package: extract → load `stg` + `dim` → SQL transform |
 | `grafana/provisioning/` | Datasources and dashboards |
+| `web/` | Static demo page: Leaflet map placeholder + Grafana panel iframes |
+
+## Grafana embeds in a local web page
+
+`docker-compose` enables **iframe embedding** and **anonymous Viewer** so a plain HTML page can show live `/d-solo/` panels without logging in. **Turn anonymous auth off** before exposing Grafana to the internet.
+
+1. Start stack and load data:
+
+   ```bash
+   docker compose up -d postgres grafana
+   docker compose run --rm etl
+   ```
+
+2. Serve the demo page (do not open `index.html` as `file://` — use HTTP):
+
+   ```bash
+   cd web
+   python -m http.server 8080
+   ```
+
+3. Open [http://localhost:8080](http://localhost:8080). You should see the map and two Grafana panels.
+
+If Grafana runs on another host/port, edit `GRAFANA_ORIGIN` in `web/index.html`.
+
+**Direct solo panel URLs** (dashboard UID `weather-dw-overview`):
+
+- Risk score (panel id `3`):  
+  `http://localhost:3000/d-solo/weather-dw-overview/weather-dw-overview?from=now-72h&to=now%2B72h&orgId=1&panelId=3&theme=dark&kiosk=1`
+- Max risk bar chart (panel id `4`):  
+  `http://localhost:3000/d-solo/weather-dw-overview/weather-dw-overview?from=now-72h&to=now%2B72h&orgId=1&panelId=4&theme=dark&kiosk=1`
 
 ## Diagram
 

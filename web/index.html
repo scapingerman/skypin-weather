@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Skypin — Map + Grafana panels</title>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0f1419;
+      --panel: #1a2332;
+      --text: #e6edf3;
+      --muted: #8b949e;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    header {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid #30363d;
+      background: var(--panel);
+    }
+    header h1 {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+    header p {
+      margin: 0.35rem 0 0;
+      font-size: 0.875rem;
+      color: var(--muted);
+    }
+    main {
+      padding: 1rem;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    #map {
+      height: 320px;
+      border-radius: 8px;
+      border: 1px solid #30363d;
+      margin-bottom: 1rem;
+    }
+    .hint {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 0.75rem;
+    }
+    .grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 900px) {
+      .grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    .frame-wrap {
+      background: var(--panel);
+      border-radius: 8px;
+      border: 1px solid #30363d;
+      overflow: hidden;
+    }
+    .frame-wrap h2 {
+      margin: 0;
+      padding: 0.5rem 0.75rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      border-bottom: 1px solid #30363d;
+      color: var(--muted);
+    }
+    iframe {
+      display: block;
+      width: 100%;
+      height: 380px;
+      border: 0;
+      background: #111;
+    }
+    code {
+      font-size: 0.8em;
+      background: #21262d;
+      padding: 0.1em 0.35em;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Skypin — Weather map (placeholder) + Grafana embeds</h1>
+    <p>
+      Map: Leaflet + OpenStreetMap. Charts: live Grafana <code>/d-solo/</code> panels (same data as
+      <code>Weather DW Overview</code>).
+    </p>
+  </header>
+  <main>
+    <p class="hint">
+      If panels stay blank: run <code>docker compose up -d postgres grafana</code>, run ETL once, then open this page
+      from a local server (see README). Edit <code>GRAFANA_ORIGIN</code> in the script below if Grafana is not on port
+      3000.
+    </p>
+    <div id="map" aria-label="World map placeholder"></div>
+    <div class="grid">
+      <div class="frame-wrap">
+        <h2>Panel 3 — Risk score by city (time series)</h2>
+        <iframe
+          id="frame-risk"
+          title="Grafana risk score panel"
+          loading="lazy"
+          referrerpolicy="no-referrer-when-downgrade"
+        ></iframe>
+      </div>
+      <div class="frame-wrap">
+        <h2>Panel 4 — Max risk by city (bar chart)</h2>
+        <iframe
+          id="frame-max"
+          title="Grafana max risk panel"
+          loading="lazy"
+          referrerpolicy="no-referrer-when-downgrade"
+        ></iframe>
+      </div>
+    </div>
+  </main>
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+  <script>
+    (function () {
+      /** Base URL of Grafana (no trailing slash). */
+      const GRAFANA_ORIGIN = "http://localhost:3000";
+      const DASH_UID = "weather-dw-overview";
+      const DASH_SLUG = "weather-dw-overview";
+      const ORG_ID = 1;
+      const TIME = "from=now-72h&to=now%2B72h";
+
+      function soloUrl(panelId) {
+        const q = new URLSearchParams({
+          orgId: String(ORG_ID),
+          panelId: String(panelId),
+          theme: "dark",
+          kiosk: "1",
+        });
+        return (
+          GRAFANA_ORIGIN +
+          "/d-solo/" +
+          encodeURIComponent(DASH_UID) +
+          "/" +
+          encodeURIComponent(DASH_SLUG) +
+          "?" +
+          TIME +
+          "&" +
+          q.toString()
+        );
+      }
+
+      document.getElementById("frame-risk").src = soloUrl(3);
+      document.getElementById("frame-max").src = soloUrl(4);
+
+      const map = L.map("map").setView([-32, -64], 4);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap",
+      }).addTo(map);
+
+      // Placeholder markers for CSV cities (next step: draw bbox + API)
+      const cities = [
+        { name: "Córdoba", lat: -31.4201, lon: -64.1888 },
+        { name: "Buenos Aires", lat: -34.6037, lon: -58.3816 },
+        { name: "Rosario", lat: -32.9468, lon: -60.6393 },
+        { name: "Mendoza", lat: -32.8908, lon: -68.8272 },
+      ];
+      cities.forEach((c) => {
+        L.marker([c.lat, c.lon]).addTo(map).bindPopup(c.name);
+      });
+    })();
+  </script>
+</body>
+</html>
