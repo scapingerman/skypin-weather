@@ -1,0 +1,290 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": "WeatherDW",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "datasource": "WeatherDW",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH latest AS (\n  SELECT run_id\n  FROM meta.etl_runs\n  WHERE status = 'success'\n  ORDER BY finished_at DESC NULLS LAST\n  LIMIT 1\n)\nSELECT count(*) AS alert_hours\nFROM mart.mart_city_hourly_risk m\nJOIN latest l ON m.run_id = l.run_id\nWHERE storm_risk_flag = true;",
+          "refId": "A"
+        }
+      ],
+      "title": "Horas En Alerta (ultima corrida)",
+      "type": "stat"
+    },
+    {
+      "datasource": "WeatherDW",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-GrYlRd"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 18,
+        "x": 6,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "datasource": "WeatherDW",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH latest AS (\n  SELECT run_id\n  FROM meta.etl_runs\n  WHERE status = 'success'\n  ORDER BY finished_at DESC NULLS LAST\n  LIMIT 1\n)\nSELECT city_name, forecast_ts_utc, precipitation, precipitation_probability, weathercode, storm_risk_flag, round(risk_score::numeric,2) AS risk_score\nFROM mart.mart_city_hourly_risk m\nJOIN latest l ON m.run_id = l.run_id\nORDER BY storm_risk_flag DESC, risk_score DESC, forecast_ts_utc ASC\nLIMIT 50;",
+          "refId": "A"
+        }
+      ],
+      "title": "Top Riesgos Por Hora",
+      "type": "table"
+    },
+    {
+      "datasource": "WeatherDW",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 3,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 16,
+        "x": 0,
+        "y": 5
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "datasource": "WeatherDW",
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "WITH latest AS (\n  SELECT run_id\n  FROM meta.etl_runs\n  WHERE status = 'success'\n  ORDER BY finished_at DESC NULLS LAST\n  LIMIT 1\n)\nSELECT forecast_ts_utc AS time, city_name AS metric, risk_score AS value\nFROM mart.mart_city_hourly_risk m\nJOIN latest l ON m.run_id = l.run_id\nORDER BY 1,2;",
+          "refId": "A"
+        }
+      ],
+      "title": "Risk Score Por Ciudad",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "WeatherDW",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 5
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "auto",
+        "showValue": "always",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "datasource": "WeatherDW",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH latest AS (\n  SELECT run_id\n  FROM meta.etl_runs\n  WHERE status = 'success'\n  ORDER BY finished_at DESC NULLS LAST\n  LIMIT 1\n)\nSELECT city_name, max(risk_score) AS max_risk\nFROM mart.mart_city_hourly_risk m\nJOIN latest l ON m.run_id = l.run_id\nGROUP BY city_name\nORDER BY max_risk DESC;",
+          "refId": "A"
+        }
+      ],
+      "title": "Max Risk Por Ciudad",
+      "type": "barchart"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 40,
+  "tags": [
+    "weather",
+    "etl",
+    "postgres"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-72h",
+    "to": "now+72h"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Weather DW Overview",
+  "uid": "weather-dw-overview",
+  "version": 1,
+  "weekStart": ""
+}

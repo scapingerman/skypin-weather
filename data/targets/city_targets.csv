@@ -1,0 +1,5 @@
+city_id,city_name,country_code,latitude,longitude,alert_rain_mm_h,min_precip_prob_pct
+1,Córdoba,AR,-31.4201,-64.1888,3.0,40
+2,Buenos Aires,AR,-34.6037,-58.3816,3.0,40
+3,Rosario,AR,-32.9468,-60.6393,3.0,40
+4,Mendoza,AR,-32.8908,-68.8272,3.0,40

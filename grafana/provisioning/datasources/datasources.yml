@@ -1,0 +1,17 @@
+apiVersion: 1
+
+datasources:
+  - name: WeatherDW
+    type: postgres
+    access: proxy
+    url: postgres:5432
+    isDefault: true
+    jsonData:
+      database: weather_dw
+      sslmode: disable
+      postgresVersion: 1600
+      timescaledb: false
+    secureJsonData:
+      password: grafana
+    user: grafana_ro
+    editable: false
