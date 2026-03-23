@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Skypin — Map + Grafana panels</title>
+  <title>Skypin — Map + area risk + Grafana</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
   <link
     rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-    crossorigin=""
+    href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"
+    crossorigin="anonymous"
   />
   <style>
     :root {
@@ -17,6 +17,7 @@
       --panel: #1a2332;
       --text: #e6edf3;
       --muted: #8b949e;
+      --border: #30363d;
     }
     * {
       box-sizing: border-box;
@@ -30,7 +31,7 @@
     }
     header {
       padding: 1rem 1.25rem;
-      border-bottom: 1px solid #30363d;
+      border-bottom: 1px solid var(--border);
       background: var(--panel);
     }
     header h1 {
@@ -49,15 +50,59 @@
       margin: 0 auto;
     }
     #map {
-      height: 320px;
+      height: 440px;
       border-radius: 8px;
-      border: 1px solid #30363d;
+      border: 1px solid var(--border);
       margin-bottom: 1rem;
+      z-index: 1;
+    }
+    .leaflet-draw-toolbar a {
+      background-color: #21262d;
     }
     .hint {
       font-size: 0.8rem;
       color: var(--muted);
       margin-bottom: 0.75rem;
+    }
+    .risk-panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      margin-bottom: 1rem;
+    }
+    .risk-panel h2 {
+      margin: 0 0 0.5rem;
+      font-size: 0.95rem;
+      color: var(--muted);
+    }
+    #risk-status {
+      font-size: 0.875rem;
+      margin-bottom: 0.5rem;
+    }
+    #risk-status.loading {
+      color: #d29922;
+    }
+    #risk-status.err {
+      color: #f85149;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+    }
+    th,
+    td {
+      text-align: left;
+      padding: 0.35rem 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    th {
+      color: var(--muted);
+      font-weight: 600;
+    }
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.04);
     }
     .grid {
       display: grid;
@@ -72,7 +117,7 @@
     .frame-wrap {
       background: var(--panel);
       border-radius: 8px;
-      border: 1px solid #30363d;
+      border: 1px solid var(--border);
       overflow: hidden;
     }
     .frame-wrap h2 {
@@ -80,7 +125,7 @@
       padding: 0.5rem 0.75rem;
       font-size: 0.85rem;
       font-weight: 600;
-      border-bottom: 1px solid #30363d;
+      border-bottom: 1px solid var(--border);
       color: var(--muted);
     }
     iframe {
@@ -100,22 +145,44 @@
 </head>
 <body>
   <header>
-    <h1>Skypin — Weather map (placeholder) + Grafana embeds</h1>
+    <h1>Skypin — Draw an area, list towns, live risk score</h1>
     <p>
-      Map: Leaflet + OpenStreetMap. Charts: live Grafana <code>/d-solo/</code> panels (same data as
-      <code>Weather DW Overview</code>).
+      Use the toolbar on the map: draw a <strong>rectangle</strong> or a <strong>closed polygon</strong>. We query
+      OpenStreetMap (cities/towns/villages), then Open-Meteo, using the same risk formula as the warehouse
+      <code>mart</code>. Grafana panels below stay global (latest ETL run).
     </p>
   </header>
   <main>
     <p class="hint">
-      If panels stay blank: run <code>docker compose up -d postgres grafana</code>, run ETL once, then open this page
-      from a local server (see README). Edit <code>GRAFANA_ORIGIN</code> in the script below if Grafana is not on port
-      3000.
+      Start API: <code>docker compose up -d api</code> (port 8000). Serve this folder:
+      <code>cd web &amp;&amp; python -m http.server 8080</code>. Set <code>API_BASE</code> / <code>GRAFANA_ORIGIN</code>
+      in the script if needed.
     </p>
-    <div id="map" aria-label="World map placeholder"></div>
+    <div id="map" aria-label="Map with draw tools"></div>
+
+    <div class="risk-panel">
+      <h2>Places inside your shape (OSM + risk)</h2>
+      <div id="risk-status">Draw a rectangle or polygon to load data.</div>
+      <div style="overflow-x: auto">
+        <table id="risk-table" hidden>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>OSM place</th>
+              <th>Lat</th>
+              <th>Lon</th>
+              <th>Max risk</th>
+              <th>Alert hours</th>
+            </tr>
+          </thead>
+          <tbody id="risk-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
     <div class="grid">
       <div class="frame-wrap">
-        <h2>Panel 3 — Risk score by city (time series)</h2>
+        <h2>Grafana — Risk score by city (time series)</h2>
         <iframe
           id="frame-risk"
           title="Grafana risk score panel"
@@ -124,7 +191,7 @@
         ></iframe>
       </div>
       <div class="frame-wrap">
-        <h2>Panel 4 — Max risk by city (bar chart)</h2>
+        <h2>Grafana — Max risk by city (bar chart)</h2>
         <iframe
           id="frame-max"
           title="Grafana max risk panel"
@@ -134,14 +201,12 @@
       </div>
     </div>
   </main>
-  <script
-    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-    crossorigin=""
-  ></script>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js" crossorigin="anonymous"></script>
   <script>
     (function () {
-      /** Base URL of Grafana (no trailing slash). */
+      const API_BASE = "http://localhost:8000";
       const GRAFANA_ORIGIN = "http://localhost:3000";
       const DASH_UID = "weather-dw-overview";
       const DASH_SLUG = "weather-dw-overview";
@@ -171,21 +236,128 @@
       document.getElementById("frame-risk").src = soloUrl(3);
       document.getElementById("frame-max").src = soloUrl(4);
 
-      const map = L.map("map").setView([-32, -64], 4);
+      const map = L.map("map").setView([-32, -64], 5);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
         attribution: "&copy; OpenStreetMap",
       }).addTo(map);
 
-      // Placeholder markers for CSV cities (next step: draw bbox + API)
-      const cities = [
-        { name: "Córdoba", lat: -31.4201, lon: -64.1888 },
-        { name: "Buenos Aires", lat: -34.6037, lon: -58.3816 },
-        { name: "Rosario", lat: -32.9468, lon: -60.6393 },
-        { name: "Mendoza", lat: -32.8908, lon: -68.8272 },
-      ];
-      cities.forEach((c) => {
-        L.marker([c.lat, c.lon]).addTo(map).bindPopup(c.name);
+      const drawnItems = new L.FeatureGroup();
+      map.addLayer(drawnItems);
+
+      const drawControl = new L.Control.Draw({
+        position: "topright",
+        draw: {
+          polygon: {
+            allowIntersection: false,
+            showArea: true,
+            shapeOptions: { color: "#58a6ff" },
+          },
+          rectangle: {
+            shapeOptions: { color: "#58a6ff" },
+          },
+          polyline: false,
+          circle: false,
+          circlemarker: false,
+          marker: false,
+        },
+        edit: {
+          featureGroup: drawnItems,
+          remove: true,
+        },
+      });
+      map.addControl(drawControl);
+
+      const statusEl = document.getElementById("risk-status");
+      const tableEl = document.getElementById("risk-table");
+      const tbodyEl = document.getElementById("risk-tbody");
+
+      async function postArea(geometry) {
+        statusEl.className = "loading";
+        statusEl.textContent = "Querying OSM + weather…";
+        tableEl.hidden = true;
+        tbodyEl.innerHTML = "";
+        try {
+          const res = await fetch(API_BASE + "/api/area/risk", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              geometry: geometry,
+              max_places: 50,
+              forecast_days: 3,
+              alert_rain_mm_h: 3,
+              min_precip_prob_pct: 40,
+            }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            const detail = data.detail || data.message || res.statusText;
+            throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+          }
+          statusEl.className = "";
+          const n = data.total_in_polygon;
+          let msg =
+            n === 0
+              ? data.message || "No places found."
+              : `Found ${n} place(s) in polygon` + (data.truncated ? " (list capped)." : ".");
+          if (data.message && n > 0) {
+            msg += " " + data.message;
+          }
+          statusEl.textContent = msg;
+          const places = data.places || [];
+          if (places.length === 0) {
+            tableEl.hidden = true;
+            return;
+          }
+          for (const p of places) {
+            const tr = document.createElement("tr");
+            tr.innerHTML =
+              "<td>" +
+              escapeHtml(p.name) +
+              "</td><td>" +
+              escapeHtml(p.place) +
+              "</td><td>" +
+              p.lat.toFixed(4) +
+              "</td><td>" +
+              p.lon.toFixed(4) +
+              "</td><td>" +
+              p.max_risk_score +
+              "</td><td>" +
+              p.alert_hours +
+              "</td>";
+            tbodyEl.appendChild(tr);
+          }
+          tableEl.hidden = false;
+        } catch (e) {
+          statusEl.className = "err";
+          statusEl.textContent = "Error: " + (e.message || String(e));
+        }
+      }
+
+      function escapeHtml(s) {
+        const d = document.createElement("div");
+        d.textContent = s;
+        return d.innerHTML;
+      }
+
+      map.on(L.Draw.Event.CREATED, function (e) {
+        drawnItems.clearLayers();
+        const layer = e.layer;
+        drawnItems.addLayer(layer);
+        const gj = layer.toGeoJSON();
+        if (gj && gj.geometry && gj.geometry.type === "Polygon") {
+          postArea(gj.geometry);
+        } else {
+          statusEl.className = "err";
+          statusEl.textContent = "Expected a closed polygon or rectangle.";
+        }
+      });
+
+      map.on(L.Draw.Event.DELETED, function () {
+        statusEl.className = "";
+        statusEl.textContent = "Draw a rectangle or polygon to load data.";
+        tableEl.hidden = true;
+        tbodyEl.innerHTML = "";
       });
     })();
   </script>

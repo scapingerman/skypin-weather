@@ -57,6 +57,16 @@ services:
     volumes:
       - ./data/targets:/data/targets:ro
 
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    ports:
+      - "${API_PORT:-8000}:8000"
+    environment:
+      OPEN_METEO_BASE: ${OPEN_METEO_BASE:-https://api.open-meteo.com/v1/forecast}
+      OVERPASS_URL: ${OVERPASS_URL:-https://overpass-api.de/api/interpreter}
+
 volumes:
   pg_data:
   grafana_data:

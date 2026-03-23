@@ -7,7 +7,7 @@ Technical roadmap by phase: [ROADMAP.md](./ROADMAP.md).
 ## Requirements
 
 - Docker Desktop (Compose v2)
-- Ports **5432** and **3000** free (or override in `.env`)
+- Ports **5432**, **3000**, and **8000** free (or override in `.env`)
 
 ## Quick start
 
@@ -47,16 +47,39 @@ ORDER BY m.storm_risk_flag DESC, m.risk_score DESC, m.forecast_ts_utc;
 | `data/targets/city_targets.csv` | Per-city thresholds (versioned spreadsheet) |
 | `etl/weather_dw/` | Python package: extract → load `stg` + `dim` → SQL transform |
 | `grafana/provisioning/` | Datasources and dashboards |
-| `web/` | Static demo page: Leaflet map placeholder + Grafana panel iframes |
+| `web/` | Leaflet map: draw polygon/rectangle → OSM places + risk table; Grafana iframes |
+| `api/` | FastAPI: `POST /api/area/risk` (GeoJSON Polygon → Overpass + Open-Meteo, same risk rules as `mart`) |
+
+## Map: draw an area and list towns with risk scores
+
+1. Start the API (uses public [Overpass](https://wiki.openstreetmap.org/wiki/Overpass_API) + Open-Meteo; mirrors auto-retry on 504):
+
+   ```bash
+   docker compose up -d api
+   ```
+
+2. Serve `web/` and open [http://localhost:8080](http://localhost:8080) (see below). Use the **draw toolbar** (rectangle or polygon, must close). The table calls `POST http://localhost:8000/api/area/risk` with your shape.
+
+- Selection size is limited (~6° per side) to protect Overpass.
+- Up to `max_places` (default 50 in the page) get a forecast; **max risk** and **alert hours** match the SQL in `etl/weather_dw/transform/sql/refresh_downstream.sql`.
+- Optional: `OVERPASS_URLS=https://a.example/api/interpreter,https://b.example/api/interpreter` in `.env` for custom mirrors.
+
+Example API call (from repo root):
+
+```bash
+curl -s -X POST http://localhost:8000/api/area/risk -H "Content-Type: application/json" --data-binary @web/example-area-request.json
+```
+
+(`web/example-area-request.json` is a sample polygon around Córdoba, AR.)
 
 ## Grafana embeds in a local web page
 
 `docker-compose` enables **iframe embedding** and **anonymous Viewer** so a plain HTML page can show live `/d-solo/` panels without logging in. **Turn anonymous auth off** before exposing Grafana to the internet.
 
-1. Start stack and load data:
+1. Start stack, API, and load warehouse data:
 
    ```bash
-   docker compose up -d postgres grafana
+   docker compose up -d postgres grafana api
    docker compose run --rm etl
    ```
 
