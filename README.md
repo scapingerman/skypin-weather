@@ -1,15 +1,15 @@
 # Weather mini data warehouse + Grafana
 
-ETL de referencia: **Open-Meteo** (forecast horario) + **CSV de umbrales** (sustituto de hoja manual) → **PostgreSQL** en capas (`meta` / `stg` / `dim` / `fact` / `mart`) → **Grafana**.
+Reference ETL: **Open-Meteo** (hourly forecast) + **threshold CSV** (manual spreadsheet substitute) → layered **PostgreSQL** (`meta` / `stg` / `dim` / `fact` / `mart`) → **Grafana**.
 
-Roadmap técnico por fases: [ROADMAP.md](./ROADMAP.md).
+Technical roadmap by phase: [ROADMAP.md](./ROADMAP.md).
 
-## Requisitos
+## Requirements
 
 - Docker Desktop (Compose v2)
-- Puerto **5432** y **3000** libres (o cambiarlos en `.env`)
+- Ports **5432** and **3000** free (or override in `.env`)
 
-## Arranque rápido
+## Quick start
 
 ```bash
 copy .env.example .env
@@ -17,12 +17,12 @@ docker compose up -d postgres grafana
 docker compose run --rm etl
 ```
 
-- Grafana: http://localhost:3000 (usuario/contraseña por defecto `admin` / `admin`, definibles en `.env`)
-- Postgres: `localhost:5432`, base `weather_dw`, usuario `weather` / `weather`
+- Grafana: http://localhost:3000 (default user/password `admin` / `admin`, configurable via `.env`)
+- Postgres: `localhost:5432`, database `weather_dw`, user `weather` / `weather`
 
-Datasource Postgres en Grafana: **WeatherDW** (provisionado), usuario **`grafana_ro`** / `grafana` (solo lectura en `mart`, `dim`, `meta`).
+Postgres datasource in Grafana: **WeatherDW** (provisioned), user **`grafana_ro`** / `grafana` (read-only on `mart`, `dim`, `meta`).
 
-## Consulta útil para paneles (última corrida OK)
+## Sample query for panels (latest successful run)
 
 ```sql
 WITH latest AS (
@@ -38,21 +38,21 @@ JOIN latest l ON m.run_id = l.run_id
 ORDER BY m.storm_risk_flag DESC, m.risk_score DESC, m.forecast_ts_utc;
 ```
 
-## Estructura del repo
+## Repository layout
 
-| Ruta | Rol |
-|------|-----|
-| `docker-compose.yml` | Postgres, Grafana, job `etl` |
-| `postgres/init/` | DDL inicial (schemas + tablas + rol Grafana) |
-| `data/targets/city_targets.csv` | Umbrales por ciudad (spreadsheet versionado) |
-| `etl/weather_dw/` | Paquete Python: extract → load `stg` + `dim` → SQL transform |
-| `grafana/provisioning/` | Datasource Postgres |
+| Path | Role |
+|------|------|
+| `docker-compose.yml` | Postgres, Grafana, `etl` batch job |
+| `postgres/init/` | Initial DDL (schemas + tables + Grafana role) |
+| `data/targets/city_targets.csv` | Per-city thresholds (versioned spreadsheet) |
+| `etl/weather_dw/` | Python package: extract → load `stg` + `dim` → SQL transform |
+| `grafana/provisioning/` | Datasources and dashboards |
 
-## Diagrama
+## Diagram
 
-Ver flujo en Mermaid en [ROADMAP.md](./ROADMAP.md).
+See the Mermaid flow in [ROADMAP.md](./ROADMAP.md).
 
-## Desarrollo local del ETL (sin reconstruir imagen)
+## Local ETL development (without rebuilding the image)
 
 ```bash
 cd etl
@@ -67,7 +67,7 @@ set TARGETS_CSV_PATH=..\data\targets\city_targets.csv
 python -m weather_dw
 ```
 
-## Notas
+## Notes
 
-- Si cambiás `POSTGRES_DB`, actualizá también `grafana/provisioning/datasources/datasources.yml` (`jsonData.database`).
-- Open-Meteo no requiere API key para el uso básico; respetá límites razonables de frecuencia en orquestación.
+- If you change `POSTGRES_DB`, update `grafana/provisioning/datasources/datasources.yml` (`jsonData.database`) as well.
+- Open-Meteo does not require an API key for basic use; keep reasonable request rates when scheduling runs.

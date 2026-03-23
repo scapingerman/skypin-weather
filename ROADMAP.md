@@ -1,83 +1,83 @@
-# Roadmap: mini data warehouse clima + Grafana
+# Roadmap: weather mini data warehouse + Grafana
 
-Stack objetivo: **Python 3.12**, **PostgreSQL 16**, **Grafana**, **Docker Compose**. Patrón **staging → dimensiones/hechos → marts** con trazabilidad de corridas ETL.
+Target stack: **Python 3.12**, **PostgreSQL 16**, **Grafana**, **Docker Compose**. Pattern **staging → dimensions/facts → marts** with ETL run traceability.
 
-**Estado:** Fase 0 implementada en repo (`docker-compose`, DDL, paquete `weather_dw`, CSV de targets, provisioning Grafana). Ejecutar: ver [README.md](./README.md).
-
----
-
-## Fase 0 — Fundación (actual)
-
-| Ítem | Detalle |
-|------|---------|
-| Infra | `docker-compose.yml`: servicios `postgres`, `grafana`, `etl` (job batch). Red interna, volúmenes persistentes. |
-| Esquema | Schemas: `meta` (corridas), `stg` (landed raw/normalized), `dim`, `fact`, `mart` (consumo BI/alertas). |
-| Contrato datos | `data/targets/city_targets.csv` = sustituto de “Google Sheets” (umbrales por ciudad). |
-| API | Open-Meteo Forecast + Geocoding (sin API key en uso básico). |
-| ETL | Paquete `weather_dw`: configuración por env, logging estructurado, transacciones, idempotencia por `run_id`. |
-| Transform | SQL versionado en repo ejecutado desde Python (`transform/runner.py`). |
-| Observabilidad | Tabla `meta.etl_runs` + logs stdout (JSON opcional en fase posterior). |
-
-**Criterio de hecho:** `docker compose run --rm etl` completa en verde; Grafana muestra datasource Postgres; consultas a `mart.*` devuelven filas.
+**Status:** Phase 0 implemented in this repo (`docker-compose`, DDL, `weather_dw` package, target CSV, Grafana provisioning). How to run: [README.md](./README.md).
 
 ---
 
-## Fase 1 — Semana 1 (MVP visible)
+## Phase 0 — Foundation (current)
 
-| Ítem | Detalle |
-|------|---------|
-| Ingesta | Extracción forecast horario por ciudad (lat/lon desde CSV o geocoding si faltan coordenadas). |
-| Staging | `stg.stg_open_meteo_hourly`: append por `run_id` (historial de pronósticos descargados). |
-| Dimensiones | `dim.dim_city` desde CSV (SCD0: upsert por `city_id`). |
-| Hechos | `fact.fact_weather_hourly_forecast`: población desde última corrida exitosa o ventana explícita (documentada). |
-| Mart | `mart.mart_city_hourly_risk`: reglas de negocio (códigos WMO tormenta + umbrales CSV). |
-| Grafana | 3–4 paneles: tabla ciudades en riesgo, time series precipitación/código, stat “alertas activas”. |
-| Documentación | README con diagrama Mermaid y variables `.env`. |
+| Item | Detail |
+|------|--------|
+| Infra | `docker-compose.yml`: `postgres`, `grafana`, `etl` (batch job). Internal network, persistent volumes. |
+| Schema | Schemas: `meta` (runs), `stg` (landed raw/normalized), `dim`, `fact`, `mart` (BI / alerting consumption). |
+| Data contract | `data/targets/city_targets.csv` = substitute for “Google Sheets” (per-city thresholds). |
+| API | Open-Meteo Forecast (+ optional geocoding; no API key for basic use). |
+| ETL | `weather_dw` package: env-based config, structured logging, transactions, `run_id` idempotency. |
+| Transform | Versioned SQL in repo executed from Python (`transform/runner.py`). |
+| Observability | `meta.etl_runs` table + stdout logs (optional JSON logs in a later phase). |
 
-**Criterio de hecho:** dashboard refleja última corrida; README permite reproducir en máquina limpia.
-
----
-
-## Fase 2 — Semana 2 (multi-fuente + KPIs cruzados)
-
-| Ítem | Detalle |
-|------|---------|
-| Segunda fuente | Ej.: Open-Meteo **Archive** (histórico 1 día) **o** segundo endpoint (p. ej. daily summary) como `stg` adicional. |
-| Modelo | Joins explícitos en `mart` (anomalía vs. clima histórico o comparación daily vs hourly). |
-| KPIs | Campos calculados en SQL (ventanas `LEAD`/`LAG` entre ciudades para heurística “propagación” demo). |
-| Calidad | Checks mínimos: filas esperadas por ciudad, nulls críticos, `meta.etl_runs` con `status=failed` ante error HTTP. |
-
-**Criterio de hecho:** al menos un panel Grafana usa métrica cruzada (dos fuentes o dos granularidades).
+**Done when:** `docker compose run --rm etl` exits successfully; Grafana shows the Postgres datasource; queries against `mart.*` return rows.
 
 ---
 
-## Fase 3 — Orquestación “estilo Airbyte/Fivetran”
+## Phase 1 — Week 1 (visible MVP)
 
-| Ítem | Detalle |
-|------|---------|
-| Scheduler | `cron` en contenedor dedicado **o** **Prefect** / **Dagster** (OSS) con un flow que invoque el mismo entrypoint. |
-| Lineage ligero | Tags `source_system`, `entity` en tablas stg; comentarios en SQL. |
-| Secrets | Solo `.env` / Docker secrets; sin credenciales en imagen. |
+| Item | Detail |
+|------|--------|
+| Ingestion | Hourly forecast extraction per city (lat/lon from CSV or geocoding if coordinates missing). |
+| Staging | `stg.stg_open_meteo_hourly`: append by `run_id` (history of downloaded forecasts). |
+| Dimensions | `dim.dim_city` from CSV (SCD0: upsert by `city_id`). |
+| Facts | `fact.fact_weather_hourly_forecast`: load from latest successful run or explicit window (documented). |
+| Mart | `mart.mart_city_hourly_risk`: business rules (WMO storm codes + CSV thresholds). |
+| Grafana | 3–4 panels: cities at risk table, precipitation/code time series, stat for active alerts. |
+| Docs | README with Mermaid diagram and `.env` variables. |
 
-**Criterio de hecho:** pipeline programado (p. ej. cada 15 min / hora) sin intervención manual.
-
----
-
-## Fase 4 — Alertas y hardening (portfolio “producción light”)
-
-| Ítem | Detalle |
-|------|---------|
-| Grafana Alerting | Reglas sobre consultas al `mart` (umbral de `risk_score`, conteo ciudades en alerta). |
-| Roles DB | Usuario lectura solo `mart` (+ `dim` si hace falta) para Grafana. |
-| CI | GitHub Actions: lint (`ruff`), `docker compose config`, smoke test ETL contra Postgres servicio. |
+**Done when:** dashboard reflects the latest run; README reproduces on a clean machine.
 
 ---
 
-## Diagrama de flujo (objetivo)
+## Phase 2 — Week 2 (multi-source + cross KPIs)
+
+| Item | Detail |
+|------|--------|
+| Second source | e.g. Open-Meteo **Archive** (1-day history) or a second endpoint (e.g. daily summary) as extra `stg`. |
+| Model | Explicit joins in `mart` (anomaly vs historical climate or daily vs hourly). |
+| KPIs | SQL window fields (`LEAD`/`LAG` across cities for a demo “propagation” heuristic). |
+| Quality | Minimal checks: expected rows per city, critical nulls, `meta.etl_runs` = `failed` on HTTP errors. |
+
+**Done when:** at least one Grafana panel uses a cross-metric (two sources or two granularities).
+
+---
+
+## Phase 3 — Orchestration (Airbyte/Fivetran-style)
+
+| Item | Detail |
+|------|--------|
+| Scheduler | `cron` in a dedicated container **or** **Prefect** / **Dagster** (OSS) calling the same entrypoint. |
+| Light lineage | Tags `source_system`, `entity` on `stg` tables; SQL comments. |
+| Secrets | Only `.env` / Docker secrets; no credentials baked into images. |
+
+**Done when:** pipeline runs on a schedule (e.g. every 15 min / hourly) without manual steps.
+
+---
+
+## Phase 4 — Alerts and hardening (“production-light” portfolio)
+
+| Item | Detail |
+|------|--------|
+| Grafana Alerting | Rules on `mart` queries (`risk_score` threshold, count of cities in alert). |
+| DB roles | Read-only user for Grafana on `mart` (+ `dim` if needed). |
+| CI | GitHub Actions: lint (`ruff`), `docker compose config`, ETL smoke test against Postgres service. |
+
+---
+
+## Target flow diagram
 
 ```mermaid
 flowchart LR
-  subgraph sources[Fuentes]
+  subgraph sources[Sources]
     API[Open-Meteo API]
     CSV[city_targets.csv]
   end
@@ -106,16 +106,16 @@ flowchart LR
 
 ---
 
-## Decisiones técnicas fijadas
+## Technical decisions (locked)
 
-1. **Incremental:** cada corrida genera `run_id`; `stg` conserva historial de extracciones; `mart` expone **última corrida exitosa** (vía `meta.etl_runs` + join o `processed_up_to_run_id` en comentarios SQL).
-2. **Transformaciones preferentemente en SQL** (auditable, portable a dbt en el futuro sin rehacer lógica de negocio).
-3. **Sin PII:** solo datos meteorológicos públicos y catálogo de ciudades.
+1. **Incremental runs:** each run has a `run_id`; `stg` keeps extraction history; `mart` is consumed for the **latest successful run** (via `meta.etl_runs` join or documented `processed_up_to_run_id`).
+2. **Transforms prefer SQL** (auditable; future dbt migration without rewriting business logic).
+3. **No PII:** only public weather data and a city catalog.
 
 ---
 
-## Referencias útiles
+## References
 
 - [Open-Meteo Forecast API](https://open-meteo.com/en/docs)
-- [WMO Weather interpretation codes](https://open-meteo.com/en/docs) (tabla en documentación)
+- [WMO Weather interpretation codes](https://open-meteo.com/en/docs) (table in docs)
 - [Grafana PostgreSQL data source](https://grafana.com/docs/grafana/latest/datasources/postgres/)

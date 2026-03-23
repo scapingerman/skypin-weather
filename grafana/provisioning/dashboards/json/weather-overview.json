@@ -86,7 +86,7 @@
           "refId": "A"
         }
       ],
-      "title": "Horas En Alerta (ultima corrida)",
+      "title": "Alert hours (latest run)",
       "type": "stat"
     },
     {
@@ -129,7 +129,7 @@
           "refId": "A"
         }
       ],
-      "title": "Top Riesgos Por Hora",
+      "title": "Top risk by hour",
       "type": "table"
     },
     {
@@ -216,7 +216,7 @@
           "refId": "A"
         }
       ],
-      "title": "Risk Score Por Ciudad",
+      "title": "Risk score by city",
       "type": "timeseries"
     },
     {
@@ -263,7 +263,7 @@
           "refId": "A"
         }
       ],
-      "title": "Max Risk Por Ciudad",
+      "title": "Max risk by city",
       "type": "barchart"
     }
   ],
@@ -285,6 +285,6 @@
   "timezone": "browser",
   "title": "Weather DW Overview",
   "uid": "weather-dw-overview",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }
