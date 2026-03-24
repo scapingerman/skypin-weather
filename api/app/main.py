@@ -146,18 +146,34 @@ async def _open_meteo_forecast(
     lon: float,
     forecast_days: int,
 ) -> dict:
-    r = await client.get(
-        OPEN_METEO_BASE,
-        params={
-            "latitude": lat,
-            "longitude": lon,
-            "hourly": HOURLY,
-            "forecast_days": forecast_days,
-            "timezone": "UTC",
-        },
-    )
-    r.raise_for_status()
-    return r.json().get("hourly") or {}
+    params = {
+        "latitude": lat,
+        "longitude": lon,
+        "hourly": HOURLY,
+        "forecast_days": forecast_days,
+        "timezone": "UTC",
+    }
+    last_err: Exception | None = None
+    for attempt in range(3):
+        try:
+            r = await client.get(OPEN_METEO_BASE, params=params)
+            r.raise_for_status()
+            return r.json().get("hourly") or {}
+        except httpx.HTTPStatusError:
+            raise
+        except (httpx.ConnectError, httpx.TimeoutException) as e:
+            last_err = e
+            LOG.warning(
+                "open-meteo failed (attempt %s/3) lat=%s lon=%s: %s",
+                attempt + 1,
+                lat,
+                lon,
+                e,
+            )
+            if attempt < 2:
+                await asyncio.sleep(0.5 * (attempt + 1))
+    assert last_err is not None
+    raise last_err
 
 
 @app.get("/health")

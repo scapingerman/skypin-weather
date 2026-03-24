@@ -444,11 +444,11 @@
       }
     ]
   },
-  "time": { "from": "now-24h", "to": "now+7d" },
+  "time": { "from": "now", "to": "now+24h" },
   "timepicker": {},
   "timezone": "browser",
   "title": "Weather area polygon",
   "uid": "weather-area-polygon",
-  "version": 3,
+  "version": 4,
   "weekStart": ""
 }

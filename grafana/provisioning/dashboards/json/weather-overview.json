@@ -82,7 +82,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH latest AS (\n  SELECT run_id\n  FROM meta.etl_runs\n  WHERE status = 'success'\n  ORDER BY finished_at DESC NULLS LAST\n  LIMIT 1\n)\nSELECT count(*) AS alert_hours\nFROM mart.mart_city_hourly_risk m\nJOIN latest l ON m.run_id = l.run_id\nWHERE storm_risk_flag = true\n  AND ('${city_name:csv}' = '$__all' OR city_name IN (${city_name:sqlstring}));",
+          "rawSql": "WITH latest AS (\n  SELECT run_id\n  FROM meta.etl_runs\n  WHERE status = 'success'\n  ORDER BY finished_at DESC NULLS LAST\n  LIMIT 1\n)\nSELECT count(*) AS alert_hours\nFROM mart.mart_city_hourly_risk m\nJOIN latest l ON m.run_id = l.run_id\nWHERE storm_risk_flag = true\n  AND (\n    '${city_name:csv}' = '$__all'\n    OR btrim('${city_name:csv}') = ''\n    OR city_name IN (\n      SELECT btrim(x)\n      FROM unnest(string_to_array('${city_name:csv}', ',')) AS u(x)\n      WHERE btrim(x) <> ''\n    )\n  );",
           "refId": "A"
         }
       ],
@@ -125,7 +125,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH latest AS (\n  SELECT run_id\n  FROM meta.etl_runs\n  WHERE status = 'success'\n  ORDER BY finished_at DESC NULLS LAST\n  LIMIT 1\n)\nSELECT city_name, forecast_ts_utc, precipitation, precipitation_probability, weathercode, storm_risk_flag, round(risk_score::numeric,2) AS risk_score\nFROM mart.mart_city_hourly_risk m\nJOIN latest l ON m.run_id = l.run_id\nWHERE ('${city_name:csv}' = '$__all' OR city_name IN (${city_name:sqlstring}))\nORDER BY storm_risk_flag DESC, risk_score DESC, forecast_ts_utc ASC\nLIMIT 50;",
+          "rawSql": "WITH latest AS (\n  SELECT run_id\n  FROM meta.etl_runs\n  WHERE status = 'success'\n  ORDER BY finished_at DESC NULLS LAST\n  LIMIT 1\n)\nSELECT city_name, forecast_ts_utc, precipitation, precipitation_probability, weathercode, storm_risk_flag, round(risk_score::numeric,2) AS risk_score\nFROM mart.mart_city_hourly_risk m\nJOIN latest l ON m.run_id = l.run_id\nWHERE (\n    '${city_name:csv}' = '$__all'\n    OR btrim('${city_name:csv}') = ''\n    OR city_name IN (\n      SELECT btrim(x)\n      FROM unnest(string_to_array('${city_name:csv}', ',')) AS u(x)\n      WHERE btrim(x) <> ''\n    )\n  )\nORDER BY storm_risk_flag DESC, risk_score DESC, forecast_ts_utc ASC\nLIMIT 50;",
           "refId": "A"
         }
       ],
@@ -212,7 +212,7 @@
           "editorMode": "code",
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "WITH latest AS (\n  SELECT run_id\n  FROM meta.etl_runs\n  WHERE status = 'success'\n  ORDER BY finished_at DESC NULLS LAST\n  LIMIT 1\n)\nSELECT forecast_ts_utc AS time, city_name AS metric, risk_score AS value\nFROM mart.mart_city_hourly_risk m\nJOIN latest l ON m.run_id = l.run_id\nWHERE ('${city_name:csv}' = '$__all' OR city_name IN (${city_name:sqlstring}))\nORDER BY 1,2;",
+          "rawSql": "WITH latest AS (\n  SELECT run_id\n  FROM meta.etl_runs\n  WHERE status = 'success'\n  ORDER BY finished_at DESC NULLS LAST\n  LIMIT 1\n)\nSELECT forecast_ts_utc AS time, city_name AS metric, risk_score AS value\nFROM mart.mart_city_hourly_risk m\nJOIN latest l ON m.run_id = l.run_id\nWHERE (\n    '${city_name:csv}' = '$__all'\n    OR btrim('${city_name:csv}') = ''\n    OR city_name IN (\n      SELECT btrim(x)\n      FROM unnest(string_to_array('${city_name:csv}', ',')) AS u(x)\n      WHERE btrim(x) <> ''\n    )\n  )\nORDER BY 1,2;",
           "refId": "A"
         }
       ],
@@ -259,7 +259,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH latest AS (\n  SELECT run_id\n  FROM meta.etl_runs\n  WHERE status = 'success'\n  ORDER BY finished_at DESC NULLS LAST\n  LIMIT 1\n)\nSELECT city_name, max(risk_score) AS max_risk\nFROM mart.mart_city_hourly_risk m\nJOIN latest l ON m.run_id = l.run_id\nWHERE ('${city_name:csv}' = '$__all' OR city_name IN (${city_name:sqlstring}))\nGROUP BY city_name\nORDER BY max_risk DESC;",
+          "rawSql": "WITH latest AS (\n  SELECT run_id\n  FROM meta.etl_runs\n  WHERE status = 'success'\n  ORDER BY finished_at DESC NULLS LAST\n  LIMIT 1\n)\nSELECT city_name, max(risk_score) AS max_risk\nFROM mart.mart_city_hourly_risk m\nJOIN latest l ON m.run_id = l.run_id\nWHERE (\n    '${city_name:csv}' = '$__all'\n    OR btrim('${city_name:csv}') = ''\n    OR city_name IN (\n      SELECT btrim(x)\n      FROM unnest(string_to_array('${city_name:csv}', ',')) AS u(x)\n      WHERE btrim(x) <> ''\n    )\n  )\nGROUP BY city_name\nORDER BY max_risk DESC;",
           "refId": "A"
         }
       ],
@@ -303,13 +303,13 @@
     ]
   },
   "time": {
-    "from": "now-72h",
-    "to": "now+72h"
+    "from": "now",
+    "to": "now+24h"
   },
   "timepicker": {},
   "timezone": "browser",
   "title": "Weather DW Overview",
   "uid": "weather-dw-overview",
-  "version": 3,
+  "version": 5,
   "weekStart": ""
 }
