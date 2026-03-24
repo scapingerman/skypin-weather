@@ -7,6 +7,30 @@ from typing import Any
 
 STORM_CODES = frozenset({95, 96, 99})
 
+# Open-Meteo documents wind_speed_10m / wind_gusts_10m in km/h for the forecast API.
+_GUST_MODERATE_KMH = 50.0
+_GUST_HIGH_KMH = 70.0
+_GUST_SEVERE_KMH = 90.0
+
+
+def max_wind_gust_kmh(hourly: dict[str, Any]) -> float:
+    """Peak hourly gust in the forecast payload (km/h per Open-Meteo)."""
+    g = hourly.get("wind_gusts_10m") or []
+    vals = [float(x) for x in g if x is not None]
+    if not vals:
+        return 0.0
+    return round(max(vals), 1)
+
+
+def gust_tier_kmh(kmh: float) -> str:
+    if kmh < _GUST_MODERATE_KMH:
+        return "low"
+    if kmh < _GUST_HIGH_KMH:
+        return "moderate"
+    if kmh < _GUST_SEVERE_KMH:
+        return "high"
+    return "severe"
+
 
 def hourly_risk(
     precipitation: float | None,
@@ -48,8 +72,8 @@ def hourly_risk_series(
     """
     One dict per forecast hour for persistence / Grafana.
     Keys: forecast_ts_utc, temperature_2m, precipitation, precipitation_probability,
-    weathercode, wind_speed_10m, wind_direction_10m, surface_pressure, cloud_cover,
-    storm_risk_flag, risk_score.
+    weathercode, wind_speed_10m, wind_gusts_10m, wind_direction_10m, surface_pressure,
+    cloud_cover, storm_risk_flag, risk_score.
     """
     h = hourly or {}
     times = h.get("time") or []
@@ -61,6 +85,7 @@ def hourly_risk_series(
     code_s = h.get("weathercode") or []
     temp_s = h.get("temperature_2m") or []
     wind_s = h.get("wind_speed_10m") or []
+    gust_s = h.get("wind_gusts_10m") or []
     wdir_s = h.get("wind_direction_10m") or []
     pres_s = h.get("surface_pressure") or []
     cloud_s = h.get("cloud_cover") or []
@@ -72,6 +97,7 @@ def hourly_risk_series(
         wc = code_s[i] if i < len(code_s) else None
         temp = temp_s[i] if i < len(temp_s) else None
         wind = wind_s[i] if i < len(wind_s) else None
+        gust = gust_s[i] if i < len(gust_s) else None
         wdir = wdir_s[i] if i < len(wdir_s) else None
         pres = pres_s[i] if i < len(pres_s) else None
         cld = cloud_s[i] if i < len(cloud_s) else None
@@ -90,6 +116,7 @@ def hourly_risk_series(
                 "precipitation_probability": int(prob) if prob is not None else None,
                 "weathercode": int(wc) if wc is not None else None,
                 "wind_speed_10m": float(wind) if wind is not None else None,
+                "wind_gusts_10m": float(gust) if gust is not None else None,
                 "wind_direction_10m": int(wdir) if wdir is not None else None,
                 "surface_pressure": float(pres) if pres is not None else None,
                 "cloud_cover": int(cld) if cld is not None else None,

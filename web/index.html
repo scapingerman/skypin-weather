@@ -53,8 +53,29 @@
       height: 440px;
       border-radius: 8px;
       border: 1px solid var(--border);
-      margin-bottom: 1rem;
+      margin-bottom: 0.5rem;
       z-index: 1;
+    }
+    .gust-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.65rem 1rem;
+      align-items: center;
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+    .gust-legend span.item {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .gust-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      flex-shrink: 0;
     }
     .leaflet-draw-toolbar a {
       background-color: #21262d;
@@ -223,8 +244,8 @@
     <p>
       Use the toolbar on the map: draw a <strong>rectangle</strong> or a <strong>closed polygon</strong>. We query
       OpenStreetMap (cities/towns/villages), then Open-Meteo, using the same risk formula as the warehouse
-      <code>mart</code>. After each draw, the API can write hourly rows to <code>api.area_selection_hourly</code> so
-      Grafana can chart <strong>every place in the polygon</strong>, not only CSV cities.
+      <code>mart</code>. After each draw, the API writes hourly rows to <code>api.area_selection_hourly</code> so Grafana
+      charts <strong>every place</strong>. Dots on the map are colored by <strong>forecast max wind gust</strong> (Open-Meteo, km/h).
     </p>
   </header>
   <main>
@@ -234,6 +255,12 @@
       in the script if needed.
     </p>
     <div id="map" aria-label="Map with draw tools"></div>
+    <div class="gust-legend" aria-label="Wind gust color key">
+      <span class="item"><span class="gust-dot" style="background: #3fb950"></span> &lt;50 km/h</span>
+      <span class="item"><span class="gust-dot" style="background: #d29922"></span> 50–70</span>
+      <span class="item"><span class="gust-dot" style="background: #db6d28"></span> 70–90</span>
+      <span class="item"><span class="gust-dot" style="background: #f85149"></span> ≥90</span>
+    </div>
 
     <div class="risk-panel">
       <h2>Places inside your shape (OSM + risk)</h2>
@@ -248,6 +275,8 @@
               <th>Lon</th>
               <th>Max risk</th>
               <th>Alert hours</th>
+              <th>Max gust (km/h)</th>
+              <th>Gust tier</th>
             </tr>
           </thead>
           <tbody id="risk-tbody"></tbody>
@@ -293,9 +322,8 @@
 
     <div id="area-grafana-section" class="area-grafana-section" hidden>
       <p class="hint" style="margin-top: 0">
-        <strong>Map polygon → Postgres:</strong> panels use <code>var-selection_id</code> from the API response (Open-Meteo
-        hourly snapshot). Requires Postgres init <code>03_api_area_selection.sql</code> and API with
-        <code>POSTGRES_HOST</code> set.
+        <strong>Map polygon → Postgres:</strong> <code>var-selection_id</code> from the API. On existing DBs run
+        <code>05_api_wind_gust_column.sql</code> if persist fails. Map dots = max gust tier (km/h).
       </p>
       <div class="grid polygon-grafana-grid">
         <div class="frame-wrap polygon-span-full">
@@ -591,6 +619,46 @@
       });
       map.addControl(drawControl);
 
+      const placeMarkersLayer = L.layerGroup().addTo(map);
+
+      function clearPlaceMarkers() {
+        placeMarkersLayer.clearLayers();
+      }
+
+      function colorForGustTier(tier) {
+        if (tier === "moderate") return "#d29922";
+        if (tier === "high") return "#db6d28";
+        if (tier === "severe") return "#f85149";
+        return "#3fb950";
+      }
+
+      function renderPlaceMarkers(places) {
+        clearPlaceMarkers();
+        for (var mi = 0; mi < places.length; mi++) {
+          var p = places[mi];
+          var tier = p.gust_tier || "low";
+          var gkh = p.max_wind_gust_kmh != null ? p.max_wind_gust_kmh : 0;
+          var mk = L.circleMarker([p.lat, p.lon], {
+            radius: 8,
+            fillColor: colorForGustTier(tier),
+            color: "#1a1e24",
+            weight: 2,
+            fillOpacity: 0.88,
+          });
+          mk.bindPopup(
+            "<strong>" +
+              escapeHtml(p.name) +
+              "</strong><br/>Max gust: " +
+              gkh +
+              " km/h (" +
+              escapeHtml(tier) +
+              ")<br/>Max risk: " +
+              p.max_risk_score
+          );
+          mk.addTo(placeMarkersLayer);
+        }
+      }
+
       const statusEl = document.getElementById("risk-status");
       const tableEl = document.getElementById("risk-table");
       const tbodyEl = document.getElementById("risk-tbody");
@@ -598,6 +666,7 @@
       async function postArea(geometry) {
         statusEl.className = "loading";
         statusEl.textContent = "Querying OSM + weather…";
+        clearPlaceMarkers();
         tableEl.hidden = true;
         tbodyEl.innerHTML = "";
         try {
@@ -633,11 +702,14 @@
             destroySelectionCharts();
             chartsSection.hidden = true;
             selectionStatsEl.hidden = true;
+            clearPlaceMarkers();
             setGrafanaFrames(null);
             setPolygonGrafanaFrames(null);
             return;
           }
           for (const p of places) {
+            const gkh = p.max_wind_gust_kmh != null ? p.max_wind_gust_kmh : 0;
+            const gt = p.gust_tier != null ? p.gust_tier : "low";
             const tr = document.createElement("tr");
             tr.innerHTML =
               "<td>" +
@@ -652,10 +724,15 @@
               p.max_risk_score +
               "</td><td>" +
               p.alert_hours +
+              "</td><td>" +
+              gkh +
+              "</td><td>" +
+              escapeHtml(gt) +
               "</td>";
             tbodyEl.appendChild(tr);
           }
           tableEl.hidden = false;
+          renderPlaceMarkers(places);
           renderSelectionCharts(places);
           var gfv = data.grafana_city_names;
           if (gfv && gfv.length) {
@@ -670,6 +747,7 @@
           destroySelectionCharts();
           chartsSection.hidden = true;
           selectionStatsEl.hidden = true;
+          clearPlaceMarkers();
           setGrafanaFrames(null);
           setPolygonGrafanaFrames(null);
         }
@@ -702,6 +780,7 @@
         destroySelectionCharts();
         chartsSection.hidden = true;
         selectionStatsEl.hidden = true;
+        clearPlaceMarkers();
         setGrafanaFrames(null);
         setPolygonGrafanaFrames(null);
       });

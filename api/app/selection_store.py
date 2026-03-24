@@ -23,6 +23,7 @@ INSERT INTO api.area_selection_hourly (
     precipitation_probability,
     weathercode,
     wind_speed_10m,
+    wind_gusts_10m,
     wind_direction_10m,
     surface_pressure,
     cloud_cover,
@@ -30,7 +31,7 @@ INSERT INTO api.area_selection_hourly (
     risk_score,
     alert_rain_mm_h
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19
 )
 """
 
@@ -65,6 +66,7 @@ async def persist_area_selection(
                     pt["precipitation_probability"],
                     pt["weathercode"],
                     pt["wind_speed_10m"],
+                    pt["wind_gusts_10m"],
                     pt["wind_direction_10m"],
                     pt["surface_pressure"],
                     pt["cloud_cover"],

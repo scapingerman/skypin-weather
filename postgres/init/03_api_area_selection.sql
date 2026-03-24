@@ -1,5 +1,5 @@
 -- Snapshot of map-polygon Open-Meteo risk (hourly) for Grafana ?var-selection_id=
--- Existing volumes: run 03 then 04 (extra meteo columns): postgres/init/04_api_area_meteo_columns.sql
+-- Existing volumes: 03, 04, 05 (wind gust column): postgres/init/04_*.sql, 05_api_wind_gust_column.sql
 
 CREATE SCHEMA IF NOT EXISTS api;
 
@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS api.area_selection_hourly (
     precipitation_probability INTEGER,
     weathercode INTEGER,
     wind_speed_10m DOUBLE PRECISION,
+    wind_gusts_10m DOUBLE PRECISION,
     wind_direction_10m INTEGER,
     surface_pressure DOUBLE PRECISION,
     cloud_cover INTEGER,

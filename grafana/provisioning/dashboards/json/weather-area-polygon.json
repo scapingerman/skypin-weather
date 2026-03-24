@@ -217,12 +217,12 @@
     },
     {
       "datasource": "WeatherDW",
-      "description": "10 m wind: ensemble mean and max across places each hour (convective gusts not in this API).",
+      "description": "10 m sustained wind: mean and max across places each hour (Open-Meteo, km/h). Gusts: see panel below.",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
           "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" },
-          "unit": "velocityms"
+          "unit": "velocitykmh"
         },
         "overrides": []
       },
@@ -251,7 +251,7 @@
           "refId": "B"
         }
       ],
-      "title": "Wind speed 10 m (area mean / max)",
+      "title": "Wind speed 10 m (area mean / max, km/h)",
       "type": "timeseries"
     },
     {
@@ -389,6 +389,42 @@
       ],
       "title": "Max risk by place",
       "type": "barchart"
+    },
+    {
+      "datasource": "WeatherDW",
+      "description": "Open-Meteo hourly wind_gusts_10m (km/h). Thresholds used in the web map: &lt;50 low, 50–70 moderate, 70–90 high, ≥90 severe.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "unit": "velocitykmh"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 42 },
+      "id": 20,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "datasource": "WeatherDW",
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT forecast_ts_utc AS time,\n       place_name AS metric,\n       wind_gusts_10m::double precision AS value\nFROM api.area_selection_hourly\nWHERE selection_id = CAST(NULLIF(TRIM('${selection_id}'), '') AS uuid)\n  AND wind_gusts_10m IS NOT NULL\nORDER BY 1, 2;",
+          "refId": "A"
+        }
+      ],
+      "title": "Wind gusts 10 m by place (km/h)",
+      "type": "timeseries"
     }
   ],
   "refresh": "",
@@ -413,6 +449,6 @@
   "timezone": "browser",
   "title": "Weather area polygon",
   "uid": "weather-area-polygon",
-  "version": 2,
+  "version": 3,
   "weekStart": ""
 }

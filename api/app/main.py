@@ -16,7 +16,7 @@ from shapely.geometry import Point
 from .dim_match import load_dim_cities, match_places_to_warehouse_names
 from .geo import bbox_too_large, geojson_polygon_to_shapely
 from .overpass import fetch_places_in_bbox
-from .risk import aggregate_forecast_risk
+from .risk import aggregate_forecast_risk, gust_tier_kmh, max_wind_gust_kmh
 from .selection_store import persist_area_selection
 
 logging.basicConfig(level=logging.INFO)
@@ -39,7 +39,7 @@ def _overpass_urls() -> list[str]:
 
 HOURLY = (
     "temperature_2m,precipitation,precipitation_probability,weathercode,"
-    "wind_speed_10m,wind_direction_10m,surface_pressure,cloud_cover"
+    "wind_speed_10m,wind_gusts_10m,wind_direction_10m,surface_pressure,cloud_cover"
 )
 MAX_CONCURRENT_METEO = 5
 
@@ -67,6 +67,15 @@ class PlaceRisk(BaseModel):
     lon: float
     max_risk_score: float
     alert_hours: int
+    # Open-Meteo returns 10 m wind & gusts in km/h (see open-meteo.com/docs).
+    max_wind_gust_kmh: float = Field(
+        default=0.0,
+        description="Max hourly wind gust in forecast window (km/h).",
+    )
+    gust_tier: str = Field(
+        default="low",
+        description="low <50, moderate 50–70, high 70–90, severe ≥90 km/h.",
+    )
 
 
 class AreaRiskResponse(BaseModel):
@@ -255,6 +264,7 @@ async def area_risk(body: AreaRiskRequest) -> AreaRiskResponse:
             body.alert_rain_mm_h,
             body.min_precip_prob_pct,
         )
+        g_kmh = max_wind_gust_kmh(hourly)
         pr = PlaceRisk(
             name=row["name"],
             place=row["place"],
@@ -262,6 +272,8 @@ async def area_risk(body: AreaRiskRequest) -> AreaRiskResponse:
             lon=row["lon"],
             max_risk_score=round(mx, 2),
             alert_hours=ah,
+            max_wind_gust_kmh=g_kmh,
+            gust_tier=gust_tier_kmh(g_kmh),
         )
         return pr, row, hourly
 
