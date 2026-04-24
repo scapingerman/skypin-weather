@@ -1,0 +1,372 @@
+:root {
+  --bg-0: #0b0f14;
+  --bg-1: #11161d;
+  --bg-2: #161d26;
+  --bg-3: #1c2530;
+  --border: #242d3a;
+  --text-0: #e6edf3;
+  --text-1: #a8b3c2;
+  --text-2: #6f7b8c;
+  --accent: #4cc9f0;
+  --accent-2: #06d6a0;
+  --warn: #ffd166;
+  --danger: #ef476f;
+  --critical: #d90429;
+  --ok: #06d6a0;
+  --radius: 10px;
+  --shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+    Ubuntu, Cantarell, sans-serif;
+  background: var(--bg-0);
+  color: var(--text-0);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.app {
+  display: grid;
+  grid-template-rows: 56px 1fr;
+  height: 100vh;
+}
+
+/* Header */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
+  border-bottom: 1px solid var(--border);
+}
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand-logo {
+  width: 28px; height: 28px; border-radius: 8px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  display: grid; place-items: center; font-weight: 800; color: #071019;
+}
+.brand-name { font-weight: 600; letter-spacing: 0.2px; }
+.brand-sub { color: var(--text-2); font-size: 12px; margin-left: 6px; }
+
+.topbar-actions { display: flex; align-items: center; gap: 10px; }
+.tenant-badge {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-1);
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+.btn {
+  background: var(--bg-3);
+  color: var(--text-0);
+  border: 1px solid var(--border);
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.btn:hover { background: #212b38; border-color: #2e3a4a; }
+.btn.primary {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #071019;
+  border: none;
+  font-weight: 600;
+}
+.btn.danger { color: var(--danger); border-color: #3a2230; }
+
+/* Layout */
+.main {
+  display: grid;
+  grid-template-columns: 1fr 420px;
+  grid-template-rows: 1fr 280px;
+  gap: 1px;
+  background: var(--border);
+  min-height: 0;
+}
+.map-wrap { background: var(--bg-1); position: relative; grid-row: 1 / 2; }
+.side { background: var(--bg-1); overflow-y: auto; grid-row: 1 / 3; }
+.bottom { background: var(--bg-1); overflow: hidden; grid-row: 2 / 3; }
+
+#map { width: 100%; height: 100%; }
+
+/* Map overrides (dark) */
+.leaflet-container { background: #0a0f15; }
+.leaflet-control-attribution {
+  background: rgba(17,22,29,0.8) !important;
+  color: var(--text-2) !important;
+}
+.leaflet-control-attribution a { color: var(--text-1) !important; }
+.leaflet-bar a, .leaflet-bar a:hover {
+  background: var(--bg-2) !important;
+  color: var(--text-0) !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+.leaflet-bar a:hover { background: #212b38 !important; }
+
+/* Toolbar de dibujo: reemplazamos el sprite de leaflet-draw por iconos propios
+   + etiqueta en español, para que sea obvio qué hace cada botón. */
+.leaflet-draw.leaflet-control {
+  margin-left: 10px !important;
+  margin-top: 10px !important;
+}
+.leaflet-draw-section + .leaflet-draw-section { margin-top: 6px; }
+.leaflet-draw-toolbar {
+  background: var(--bg-2) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 8px !important;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.leaflet-draw-toolbar a,
+.leaflet-draw-toolbar a:hover {
+  background-image: none !important;
+  background-color: var(--bg-2) !important;
+  color: var(--text-0) !important;
+  width: 190px !important;
+  height: 34px !important;
+  line-height: 34px !important;
+  padding: 0 12px 0 36px !important;
+  text-align: left !important;
+  font-size: 12px !important;
+  font-weight: 500;
+  border: none !important;
+  border-bottom: 1px solid var(--border) !important;
+  position: relative;
+  text-indent: 0 !important;
+}
+.leaflet-draw-toolbar a:last-child { border-bottom: none !important; }
+.leaflet-draw-toolbar a:hover {
+  background-color: var(--bg-3) !important;
+  color: var(--accent) !important;
+}
+.leaflet-draw-toolbar a.leaflet-disabled {
+  opacity: 0.4 !important;
+  cursor: not-allowed !important;
+}
+/* Icono a la izquierda */
+.leaflet-draw-toolbar a::before {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 32px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  color: var(--accent);
+}
+.leaflet-draw-toolbar .leaflet-draw-draw-polygon::before   { content: '⬠'; }
+.leaflet-draw-toolbar .leaflet-draw-draw-rectangle::before { content: '▭'; }
+.leaflet-draw-toolbar .leaflet-draw-edit-edit::before      { content: '✎'; }
+.leaflet-draw-toolbar .leaflet-draw-edit-remove::before    { content: '🗑'; font-size: 13px; }
+/* Etiqueta a la derecha */
+.leaflet-draw-toolbar .leaflet-draw-draw-polygon::after    { content: 'Dibujar zona'; }
+.leaflet-draw-toolbar .leaflet-draw-draw-rectangle::after  { content: 'Rectángulo'; }
+.leaflet-draw-toolbar .leaflet-draw-edit-edit::after       { content: 'Editar zonas'; }
+.leaflet-draw-toolbar .leaflet-draw-edit-remove::after     { content: 'Borrar zonas'; }
+
+/* Panel lateral de acciones durante el dibujo: "Finish", "Delete last point", "Cancel" */
+.leaflet-draw-actions {
+  background: var(--bg-2) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 6px !important;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  left: 32px !important;         /* separar un poco del toolbar */
+}
+.leaflet-draw-actions li { border: none !important; }
+.leaflet-draw-actions li a,
+.leaflet-draw-actions li:first-child a,
+.leaflet-draw-actions li:last-child a {
+  background: var(--bg-2) !important;
+  color: var(--text-0) !important;
+  border: none !important;
+  border-left: 1px solid var(--border) !important;
+  height: 30px !important;
+  line-height: 30px !important;
+  padding: 0 14px !important;
+  font-size: 12px !important;
+  font-weight: 500;
+  text-shadow: none !important;
+}
+.leaflet-draw-actions li:first-child a { border-left: none !important; }
+.leaflet-draw-actions li a:hover {
+  background: var(--accent) !important;
+  color: #071019 !important;
+}
+
+/* Tooltip que sigue al cursor mientras dibujás */
+.leaflet-draw-tooltip {
+  background: var(--bg-3) !important;
+  color: var(--text-0) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 4px !important;
+  padding: 5px 9px !important;
+  font-size: 12px !important;
+  box-shadow: var(--shadow);
+}
+.leaflet-draw-tooltip:before { border-right-color: var(--bg-3) !important; }
+.leaflet-draw-tooltip-subtext { color: var(--accent) !important; }
+
+/* Vértices del polígono en dibujo / edición */
+.leaflet-div-icon,
+.leaflet-editing-icon {
+  background: var(--accent) !important;
+  border: 1px solid #071019 !important;
+  border-radius: 2px !important;
+}
+
+/* Side panel */
+.side { padding: 16px; }
+.side h3 {
+  margin: 0 0 10px; font-size: 13px; text-transform: uppercase;
+  letter-spacing: 1px; color: var(--text-2);
+}
+.zone-picker {
+  display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;
+}
+.chip {
+  padding: 6px 10px; font-size: 12px; border-radius: 999px;
+  background: var(--bg-3); border: 1px solid var(--border);
+  cursor: pointer; color: var(--text-1);
+}
+.chip.active { background: var(--accent); color: #071019; border-color: transparent; font-weight: 600; }
+
+.metric-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+}
+.card {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  box-shadow: var(--shadow);
+}
+.card h4 {
+  margin: 0 0 4px; font-size: 11px;
+  color: var(--text-2); text-transform: uppercase; letter-spacing: 0.6px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.card .value {
+  font-size: 22px; font-weight: 700; font-family: var(--mono);
+}
+.card .unit { color: var(--text-2); font-size: 12px; margin-left: 3px; }
+.card .sub { color: var(--text-2); font-size: 11px; margin-top: 2px; }
+
+/* Badges de fuente de datos (real vs mock) */
+.source-badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: var(--mono);
+  cursor: help;
+}
+.source-badge.real {
+  background: rgba(6, 214, 160, 0.14);
+  color: var(--ok);
+  border: 1px solid rgba(6, 214, 160, 0.35);
+}
+.source-badge.mock {
+  background: rgba(255, 209, 102, 0.12);
+  color: var(--warn);
+  border: 1px solid rgba(255, 209, 102, 0.35);
+}
+.source-badge.inline { display: inline-block; margin: 0 3px; }
+
+.data-attribution {
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--text-2);
+  padding: 8px 10px;
+  background: var(--bg-3);
+  border-radius: 6px;
+  line-height: 1.6;
+}
+.data-attribution a { color: var(--accent); text-decoration: none; }
+.data-attribution a:hover { text-decoration: underline; }
+
+.risk-card { grid-column: 1 / -1; }
+.risk-score {
+  display: flex; align-items: baseline; gap: 12px; margin-top: 4px;
+}
+.risk-score .big { font-size: 40px; font-weight: 800; font-family: var(--mono); }
+.risk-level {
+  padding: 3px 10px; border-radius: 999px; font-size: 11px;
+  font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;
+}
+.risk-level.low { background: rgba(6,214,160,0.15); color: var(--ok); }
+.risk-level.medium { background: rgba(255,209,102,0.15); color: var(--warn); }
+.risk-level.high { background: rgba(239,71,111,0.15); color: var(--danger); }
+.risk-level.critical { background: rgba(217,4,41,0.2); color: var(--critical); }
+
+.driver-row {
+  display: flex; align-items: center; gap: 8px; font-size: 12px;
+  margin-top: 6px;
+}
+.driver-row .bar {
+  flex: 1; height: 6px; border-radius: 3px; background: var(--bg-3); overflow: hidden;
+}
+.driver-row .bar > span {
+  display: block; height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+}
+.driver-row .contrib { font-family: var(--mono); color: var(--text-1); width: 46px; text-align: right; }
+.recommendation {
+  margin-top: 10px; font-size: 12px; color: var(--text-1);
+  border-left: 2px solid var(--accent);
+  padding: 6px 10px; background: var(--bg-3);
+  border-radius: 0 6px 6px 0;
+}
+
+/* Bottom */
+.bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); }
+.bottom > div { background: var(--bg-1); overflow: auto; padding: 12px 16px; }
+.bottom h3 {
+  margin: 0 0 8px; font-size: 12px; letter-spacing: 1px;
+  text-transform: uppercase; color: var(--text-2);
+}
+
+/* Table */
+table.zones {
+  width: 100%; border-collapse: collapse; font-size: 12px;
+}
+table.zones th, table.zones td {
+  text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border);
+}
+table.zones th { color: var(--text-2); font-weight: 500; font-size: 11px; text-transform: uppercase; }
+table.zones tr:hover { background: var(--bg-2); cursor: pointer; }
+table.zones tr.selected { background: rgba(76,201,240,0.08); }
+table.zones td.mono { font-family: var(--mono); }
+.level-dot {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px;
+}
+.level-dot.low { background: var(--ok); }
+.level-dot.medium { background: var(--warn); }
+.level-dot.high { background: var(--danger); }
+.level-dot.critical { background: var(--critical); }
+
+/* Empty state */
+.empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: var(--text-2); font-size: 13px; text-align: center; padding: 24px;
+}
+.empty strong { color: var(--text-0); display: block; margin-bottom: 6px; }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+  background: var(--bg-3); border: 1px solid var(--border);
+  padding: 10px 14px; border-radius: 8px; box-shadow: var(--shadow);
+  font-size: 13px; color: var(--text-0); z-index: 9999;
+}
