@@ -43,6 +43,17 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Check Sentinel secrets
+        env:
+          SENTINEL_CLIENT_ID: ${{ secrets.SENTINEL_CLIENT_ID }}
+          SENTINEL_CLIENT_SECRET: ${{ secrets.SENTINEL_CLIENT_SECRET }}
+        run: |
+          if [ -z "$SENTINEL_CLIENT_ID" ] || [ -z "$SENTINEL_CLIENT_SECRET" ]; then
+            echo "Sentinel secrets are missing"
+            exit 1
+          fi
+          echo "Sentinel credentials are present (values not printed)"
+
       - name: Install dependencies
         run: pip install -r requirements.txt
 
